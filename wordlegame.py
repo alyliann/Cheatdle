@@ -18,7 +18,7 @@ st.set_page_config(
 st.logo('captures/cheatdle.png')
 
 
-# Begin 3Blue1Brown code below:
+# Begin 3Blue1Brown-sampled code below:
 
 MISPLACED = np.uint8(1)
 EXACT = np.uint8(2)
@@ -554,9 +554,8 @@ with stats:
         df = pd.DataFrame(stats)
         st.dataframe(df, width=200, hide_index=True)
 
-
-st.divider()
-
-st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
-if st.checkbox(label="Show Possible Answers"):
-    st.write(st.session_state["possibilities"])
+if not st.session_state["game_over"]:
+    st.divider()
+    st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
+    if st.checkbox(label="Show Possible Answers"):
+        st.write(st.session_state["possibilities"])
