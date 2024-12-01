@@ -9,11 +9,6 @@ from scipy.stats import entropy
 import pickle
 import altair as alt
 import plotly.express as px
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
-from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
 st.set_page_config(
@@ -21,7 +16,7 @@ st.set_page_config(
     page_icon="🟩"
 )
 
-st.image('captures/cheatdle.png', width=300)
+st.logo('captures/cheatdle.png')
 
 
 # Begin streamlit code:
@@ -142,7 +137,8 @@ with forest:
         st.stop()
     st.markdown(
     """
-    Enter any **5-letter Wordle word**, and we'll predict the average number of guesses it'll take someone to guess it!
+    Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
+    We'll also show worldwide statistics to see how your word stacks up.
     """)
     word = st.text_input("Enter a 5-letter Wordle word:", max_chars=5, key="forest").lower()
     if word:

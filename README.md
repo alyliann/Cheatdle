@@ -22,7 +22,7 @@
     <a href="https://github.com/ahmadbasyouni10/Cheatdle"><strong>Explore »</strong></a>
     <br />
     <br />
-    <a href="">View Project Site</a>
+    <a href="https://cheatdle-box.streamlit.app/">View Project Site</a>
     ·
     <a href="https://github.com/ahmadbasyouni10/Cheatdle/issues">Report Bug</a>
     ·
