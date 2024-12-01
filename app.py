@@ -699,12 +699,6 @@ with sentiment:
 with forest:
     st.header("🎯 Score Predictor")
     # Load datasets
-    try:
-        tweets = pd.read_csv("data/tweets.zip")
-        words = pd.read_csv("data/words_freq.csv")
-    except FileNotFoundError as e:
-        st.error(f"Error: {e}. Ensure the file paths are correct.")
-        st.stop()
     st.markdown(
     """
     Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
