@@ -8,13 +8,14 @@ textblob
 scipy
 altair
 plotly
-langchain
 langchain_community
 langchain_openai
 langchain_huggingface
 huggingface-hub
-faiss-cpu
 openai
 python-dotenv
 pypdf
 sentence-transformers
+faiss-cpu
+langchain
+streamlit
