@@ -698,11 +698,17 @@ with sentiment:
 
 with forest:
     st.header("🎯 Score Predictor")
-
+    # Load datasets
+    try:
+        tweets = pd.read_csv("data/tweets.zip")
+        words = pd.read_csv("data/words_freq.csv")
+    except FileNotFoundError as e:
+        st.error(f"Error: {e}. Ensure the file paths are correct.")
+        st.stop()
     st.markdown(
     """
-    Enter any **5-letter Wordle word**, and we'll predict the average number of guesses it'll take someone to guess it!  
-    We'll also visualize statistics from around the world and provide comparisons to see how your word will stack up.
+    Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
+    We'll also show worldwide statistics to see how your word stacks up.
     """)
     word = st.text_input("Enter a 5-letter Wordle word:", max_chars=5, key="forest").lower()
     if word:
@@ -710,55 +716,24 @@ with forest:
         if not word.isalpha() or len(word) != 5:
             st.error("Please enter a valid 5-letter word.")
         else:
-            # Load datasets
-            @st.cache_data
-            def load_forest_data():
-                tweets = pd.read_csv("data/tweets.zip")
-                words = pd.read_csv("data/words_freq.csv")
-                tweets["score"] = tweets["tweet_text"].str[11]
-                tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
-                tweets.rename(columns={"wordle_id": "day"}, inplace=True)
-                words.dropna(inplace=True)
-                words["day"] = pd.to_numeric(words['day'], errors='coerce')
-                freqs = pd.read_csv("data/letter-frequencies.csv")
-                freqs = freqs[["Letter", "English"]]
-                freqs = freqs["English"].tolist()
-                df = pd.merge(words, tweets, on='day')
-                df.drop(columns=['tweet_id'], inplace=True)
-                averages = df.groupby("word", as_index=False)['score'].mean()
-                percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
-                labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
-                chart_data = pd.DataFrame(
-                    {
-                        "Tries": labels,
-                        "Percentage": percents,
-                    }
-                )
-                countries = pd.read_csv("data/countries.csv")
-                global_cities = pd.read_csv("data/top10_global_cities.csv")
-                us_cities = pd.read_csv("data/top10_us_cities.csv")
-                states = pd.read_csv("data/states.csv")
-                return freqs, df, averages, countries, chart_data, global_cities, us_cities, states
-            freqs, df, averages, countries, chart_data, global_cities, us_cities, states = load_forest_data()
-
-            # Load model
-            @st.cache_resource
-            def load_model():
-                filename = 'data/wordle_prediction.pkl'
-                model = pickle.load(open(filename, 'rb'))
-                return model
-            model = load_model()
-
             st.success(f"Running random forest...")
-
+            tweets["score"] = tweets["tweet_text"].str[11]
+            tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
+            tweets.rename(columns={"wordle_id": "day"}, inplace=True)
+            words.dropna(inplace=True)
+            words["day"] = pd.to_numeric(words['day'], errors='coerce')
+            freqs = pd.read_csv("data/letter-frequencies.csv")
+            freqs = freqs[["Letter", "English"]]
+            freqs = freqs["English"].tolist()
+            df = pd.merge(words, tweets, on='day')
+            df.drop(columns=['tweet_id'], inplace=True)
+            filename = 'data/wordle_prediction.pkl'
+            model = pickle.load(open(filename, 'rb'))
             # For any given word:
             #    1. Put the word in lower case
             #    2. Extract each letter in the word and make it it's own column
             #    3. Convert to ASCII number using ord() function
-            #    4. subtract 97 to simplify char to number representation (a = 0, b = 1, c = 2, ...)
-            #    5. get frequency of each character using number representation as index to frequency array 
-
-            @st.cache_data
+            #    4. subtract 96 to simplify char to number representation (a = 1, b = 2, c = 3, ...)
             def predict_score(word):
                 if (not word.isalpha() or len(word) != 5):
                     raise Exception(
@@ -777,6 +752,7 @@ with forest:
                                 freqs[df["letter_5"][0]]
                 df.drop(columns=["word"], inplace=True)
                 return model.predict(df)
+            averages = df.groupby("word", as_index=False)['score'].mean()
             prediction = predict_score(word)
             # If word isn't found in tweet data, None is returned for the average score
             average = None
@@ -804,12 +780,21 @@ with forest:
                 st.subheader("🥳 Streak savior!")
                 st.markdown("The average Wordle score is **3.83**. Looks like the average person should be able to figure this one out.")
             st.markdown("**Refer to the chart below to see the percentage breakdown for the results of every Wordle game!**")
-
+            percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
+            labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
+            chart_data = pd.DataFrame(
+                {
+                    "Tries": labels,
+                    "Percentage": percents,
+                }
+            )
             c = alt.Chart(chart_data).mark_bar().encode(x='Tries', y='Percentage')
             st.altair_chart(c, use_container_width=True) 
             st.subheader("🌎 Your word vs. the world")
-
-            @st.cache_data
+            countries = pd.read_csv("data/countries.csv")
+            global_cities = pd.read_csv("data/top10_global_cities.csv")
+            us_cities = pd.read_csv("data/top10_us_cities.csv")
+            states = pd.read_csv("data/states.csv")
             def get_bounds(scores, names, prediction):
                 if prediction > max(scores):
                     return None, float('inf')
@@ -827,7 +812,6 @@ with forest:
                     if scores[i] < prediction and scores[i] > lower:
                         lower = i
                 return higher, lower
-
             st.markdown("### Global ranking")
             st.markdown("The below chart shows a map of the world organized by the **average scores of each country**.")
             names = countries["Country"].tolist()
