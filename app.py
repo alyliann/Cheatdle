@@ -42,13 +42,14 @@ with sentiment:
     )
 
     @st.cache_resource
-    def load_data(file_path, chunk_size=1000):
+    def load_data(file_path, chunk_size=10000):
         return pd.read_csv(file_path, chunksize=chunk_size)
 
     # Load datasets
     try:
         words_freq = pd.read_csv("data/words_freq.csv")
         tweets = load_data("data/tweets.zip")
+        print(tweets.head())
     except FileNotFoundError as e:
         st.error(f"Error: {e}. Ensure the file paths are correct.")
         st.stop()
