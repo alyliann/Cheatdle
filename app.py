@@ -41,10 +41,14 @@ with sentiment:
         """
     )
 
+    @st.cache_resource
+    def load_data(file_path, chunk_size=1000):
+        return pd.read_csv(file_path, chunksize=chunk_size)
+
     # Load datasets
     try:
         words_freq = pd.read_csv("data/words_freq.csv")
-        tweets = pd.read_csv("data/tweets.zip")
+        tweets = load_data("data/tweets.zip")
     except FileNotFoundError as e:
         st.error(f"Error: {e}. Ensure the file paths are correct.")
         st.stop()
@@ -139,7 +143,7 @@ with forest:
     st.header("🎯 Score Predictor")
     # Load datasets
     try:
-        tweets = pd.read_csv("data/tweets.zip")
+        tweets = pd.read_csv("data/tweets.zip", nrows=5000)
         words = pd.read_csv("data/words_freq.csv")
     except FileNotFoundError as e:
         st.error(f"Error: {e}. Ensure the file paths are correct.")
@@ -165,8 +169,12 @@ with forest:
             freqs = freqs["English"].tolist()
             df = pd.merge(words, tweets, on='day')
             df.drop(columns=['tweet_id'], inplace=True)
-            filename = 'data/wordle_prediction.pkl'
-            model = pickle.load(open(filename, 'rb'))
+            @st.cache_resource
+            def load_model():
+                # Load the prediction model once
+                return pickle.load(open("data/wordle_prediction.pkl", "rb"))
+
+            model = load_model()
             # For any given word:
             #    1. Put the word in lower case
             #    2. Extract each letter in the word and make it it's own column
