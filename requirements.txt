@@ -11,3 +11,4 @@ python-dotenv==1.0.1
 scipy==1.14.1
 streamlit==1.39.0
 textblob==0.18.0.post0
+scikit-learn
