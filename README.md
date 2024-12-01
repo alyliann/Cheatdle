@@ -8,7 +8,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-<!-- [![MIT License][license-shield]][license-url] -->
+
 
 <!-- PROJECT LOGO -->
 <br />
@@ -29,7 +29,6 @@
     <a href="https://github.com/ahmadbasyouni10/Cheatdle/pulls">Request Feature</a>
   </p>
 </div>
-
 
 
 <!-- TABLE OF CONTENTS -->
@@ -58,7 +57,6 @@
 </details>
 
 
-
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
@@ -74,7 +72,6 @@ Originally an adaptation of 3Blue1Brown's video, _[Solving Wordle using informat
 
 You can learn more about this project by referring to the project design document, or by asking the project RAG!
 
-
 ### Built With
 [![Python][Python]][Python-url]
 [![Numpy][Numpy]][Numpy-url]
@@ -87,7 +84,6 @@ You can learn more about this project by referring to the project design documen
 [![Pygame][Pygame]][Pygame-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 
 <!-- GETTING STARTED -->
@@ -113,7 +109,7 @@ python -m ensurepip --upgrade
 
 1. Clone the repo
    ```sh
-   git clone https://github.com/github_username/repo_name.git
+   git clone https://github.com/ahmadbasyouni10/Cheatdle.git
    ```
 2. Install PIP packages
    ```sh
@@ -132,11 +128,8 @@ python -m ensurepip --upgrade
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-
 <!-- USAGE EXAMPLES -->
 ## Usage
-
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
 ### Wordle Solver
 ![image](https://github.com/user-attachments/assets/74004d6c-73d1-4ee8-8ecc-be0d93a828cb)
@@ -150,37 +143,7 @@ Use this space to show useful examples of how a project can be used. Additional 
 ### Cheatdle Project RAG
 ![image](https://github.com/user-attachments/assets/63c00a0d-0329-4266-8cd3-c233fb5fd42d)
 
-
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- CONTRIBUTING -->
-## Contributing
-
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated!**
-
-Have any other ideas of how to cheat in Wordle? Please fork the repo and create a pull request. You can also open an issue with the tag "enhancement".
-
-Don't forget to give the project a star! Thanks again!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-<!-- LICENSE 
-## License
-
-Distributed under the MIT License. See `LICENSE.txt` for more information.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
--->
 
 
 <!-- CONTACT -->
@@ -208,7 +171,6 @@ Special thanks to:
 * [Zack DeSario](https://www.linkedin.com/in/zackd/)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
