@@ -28,7 +28,6 @@ LONG_WORD_LIST_FILE = "data/wordle-answers.txt"  # possible answers
 WORD_FREQ_FILE = "data/freq_map.json"
 PATTERN_MATRIX_FILE = "data/pattern_matrix.npy"
 ENT_SCORE_PAIRS_FILE = "data/ent_score_pairs.json"
-WORDLE_GAME_FILE = "data/guesses.json"
 
 PATTERN_GRID_DATA = dict()
 CHUNK_LENGTH = 13000
@@ -48,7 +47,7 @@ def get_word_list(short=False):
     result = []
     file = SHORT_WORD_LIST_FILE if short else LONG_WORD_LIST_FILE
     with open(file) as fp:
-        result.extend([word.strip() for word in fp.readlines()])
+        result.extend([word.strip().upper() for word in fp.readlines()])
     return result
 
 
@@ -62,7 +61,7 @@ def get_word_frequencies(regenerate=False):
     with open(WORD_FREQ_FILE) as fp:
         for line in fp.readlines():
             pieces = line.split(' ')
-            word = pieces[0]
+            word = pieces[0].upper()
             freqs = [
                 float(piece.strip())
                 for piece in pieces[1:]
@@ -270,21 +269,16 @@ def optimal_guess(allowed_words, possible_words, priors):
     ents = get_entropies(allowed_words, possible_words, weights)
 
     top_ent = sorted(ents)[-10:]
-    # print('top_ent:', top_ent)
     top_i = sorted(np.argsort(ents)[-10:])[::-1]
-    # print('top_i:', top_i)
     top_guesses = []
     for num in top_i:
         top_guesses.append(allowed_words[num])
-    # print('top_guesses:', top_guesses)
 
-    # print('Suggestions: ', end='')
     st.session_state["suggestions"] = {}
     for i in range(10):
         st.session_state["suggestions"][i] = {
             top_guesses[i]: top_ent[i]
         }
-        # print(top_guesses[i], end=', ')
 
     return (allowed_words[np.argmax(ents)])
 
@@ -297,26 +291,20 @@ def get_next_guess(guesses, patterns, possibilities):
         for g, p in zip(guesses, patterns)
     )
     if phash not in st.session_state["next_guess_map"]:
-        choices = all_words
+        choices = st.session_state["DICT_ANSWERS"]
         st.session_state["next_guess_map"][phash] = optimal_guess(
             choices, possibilities, st.session_state["priors"]
         )
-    return st.session_state["next_guess_map"][phash]
 
 
 def analyze_guesses(guess, possibilities):
-    # print("\nGuess:", guess)
-    pattern = get_pattern(guess, st.session_state["answer"].lower())
-    # guesses.append(guess)
+    pattern = get_pattern(guess, st.session_state["answer"])
     st.session_state["patterns"].append(pattern)
 
     possibilities = get_possible_words(guess, pattern, possibilities)
-    # print("Possibilities:", possibilities[:12])
-    # print("Possibilities count:", len(possibilities))
 
-    next_guess = get_next_guess(
-        st.session_state["guesses_lower"], st.session_state["patterns"], possibilities)
-    # print('\nNext best Guess:', next_guess)
+    get_next_guess(st.session_state["guesses"],
+                   st.session_state["patterns"], possibilities)
     return possibilities
 
 
@@ -330,7 +318,7 @@ def get_stats(data):
     }
     for index in data:
         for word, ent in data[index].items():
-            stats['Top picks'].insert(0, word)
+            stats['Top picks'].insert(0, word.lower())
             stats['E[Info.]'].insert(0, ent)
     return stats
 
@@ -347,12 +335,7 @@ def load_dict(file_name, upper=True):
             return [word for word in words]
 
 
-# Initialize game variables
-# necessary for 3b1b word matrix and guess suggestions
-DICT_GUESSING = load_dict('data/wordle-answers.txt')
-DICT_ANSWERS = load_dict('data/wordle-answers.txt')
-ANSWER = random.choice(DICT_ANSWERS)
-all_words = load_dict('data/wordle-answers.txt', upper=False)
+# Initialize necessary variables for Wordle clone
 
 WIDTH = 600
 HEIGHT = 700
@@ -373,18 +356,19 @@ FONT_SMALL = pygame.font.SysFont("free sans bold", SQ_SIZE // 2)
 
 if "guesses" not in st.session_state:
     # Streamlit state initialization
+    st.session_state["DICT_GUESSING"] = load_dict('data/wordle-answers.txt')
+    st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
     st.session_state["guesses"] = []
-    st.session_state["guesses_lower"] = []
     st.session_state["input"] = ""
-    st.session_state["answer"] = ANSWER
-    # print('Answer:', ANSWER)
+    st.session_state["answer"] = random.choice(
+        st.session_state["DICT_ANSWERS"])
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     st.session_state["game_over"] = False
     st.session_state["priors"] = get_frequency_based_priors()
     st.session_state["next_guess_map"] = {}
     st.session_state["patterns"] = []
     st.session_state["possibilities"] = list(
-        filter(lambda w: st.session_state["priors"][w] > 0, all_words))
+        filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
     # Default guess suggestions:
     st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
         "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
@@ -435,12 +419,6 @@ def draw_guesses(surface):
 # Begin Streamlit code:
 
 
-def load_words_dict(file_name):
-    with open(file_name, 'r') as f:
-        words = [line.strip() for line in f.readlines()]
-        return [word.lower() for word in words]
-
-
 def render_frame():
     surface = pygame.Surface((WIDTH, HEIGHT))
     surface.fill("white")
@@ -457,9 +435,8 @@ def rerun():
 def input_guess():
     guess = st.session_state.guess.upper()
     if len(guess) == 5:
-        if guess in DICT_GUESSING:
+        if guess in st.session_state["DICT_GUESSING"]:
             st.session_state["guesses"].append(guess)
-            st.session_state["guesses_lower"].append(guess.lower())
             st.session_state["unguessed"] = determine_unguessed_letters(
                 st.session_state["guesses"])
             st.session_state["game_over"] = (
@@ -517,9 +494,9 @@ with wordle:
 
         if st.button("Restart Game"):
             st.session_state["guesses"] = []
-            st.session_state["guesses_lower"] = []
             st.session_state["input"] = ""
-            st.session_state["answer"] = random.choice(DICT_ANSWERS)
+            st.session_state["answer"] = random.choice(
+                st.session_state["DICT_ANSWERS"])
             st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             st.session_state["game_over"] = False
             st.session_state["game_won"] = False
@@ -527,7 +504,7 @@ with wordle:
             st.session_state["next_guess_map"] = {}
             st.session_state["patterns"] = []
             st.session_state["possibilities"] = list(
-                filter(lambda w: st.session_state["priors"][w] > 0, all_words))
+                filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
             # Default guess suggestions:
             st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
                 "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
@@ -538,7 +515,7 @@ with stats:
 
     if len(st.session_state["guesses"]) > 0:
         st.session_state["possibilities"] = analyze_guesses(
-            st.session_state["guesses_lower"][-1], st.session_state["possibilities"])
+            st.session_state["guesses"][-1], st.session_state["possibilities"])
 
     if not st.session_state["game_over"]:
         if len(st.session_state["possibilities"]) < 3:
@@ -547,7 +524,7 @@ with stats:
                 'E[Info.]': []
             }
             for word in st.session_state["possibilities"]:
-                stats['Top picks'].append(word)
+                stats['Top picks'].append(word.lower())
                 stats['E[Info.]'].append('')
         else:
             stats = get_stats(st.session_state["suggestions"])
