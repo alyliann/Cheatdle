@@ -1,9 +1,15 @@
 streamlit
-pandas
 numpy
+pandas
 textblob
 pygame
 altair
 plotly
 scipy
 scikit-learn
+python-dotenv
+langchain-community
+langchain-openai
+torch
+faiss-cpu
+openai
