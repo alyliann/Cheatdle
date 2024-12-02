@@ -9,7 +9,7 @@ import os
 
 # Load environment variables
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = st.secrets["OPENAI_API_KEY"]
 
 # Set environment variable to handle tokenizer warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
