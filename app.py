@@ -527,8 +527,12 @@ with wordle:
         st.markdown(
             f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
 
-        st.dataframe(st.session_state["df"].style.applymap(color_char1, subset='0').applymap(
-            color_char2, subset='1').applymap(color_char3, subset='2').applymap(color_char4, subset='3').applymap(color_char5, subset='4'), hide_index=True)
+        st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
+                                 .map(color_char2, subset='1')
+                                 .map(color_char3, subset='2')
+                                 .map(color_char4, subset='3')
+                                 .map(color_char5, subset='4'), 
+             hide_index=True)
 
         [input, restart] = st.columns([0.7, 0.4])
 
