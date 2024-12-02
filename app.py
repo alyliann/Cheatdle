@@ -11,6 +11,17 @@ from scipy.stats import entropy
 import pickle
 import altair as alt
 import plotly.express as px
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # Updated import
+from langchain.chains import RetrievalQA
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import gc
+import torch
+import logging
+
+# Existing imports, plus new RAG-specific imports
 
 st.set_page_config(
     page_title="Cheatdle",
@@ -44,6 +55,7 @@ def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 
+@st.cache_data
 def get_word_list(short=False):
     result = []
     file = SHORT_WORD_LIST_FILE if short else LONG_WORD_LIST_FILE
@@ -51,7 +63,7 @@ def get_word_list(short=False):
         result.extend([word.strip().upper() for word in fp.readlines()])
     return result
 
-
+@st.cache_data
 def get_word_frequencies(regenerate=False):
     if os.path.exists('data/freq_map.json') or regenerate:
         with open('data/freq_map.json') as fp:
@@ -72,7 +84,7 @@ def get_word_frequencies(regenerate=False):
         json.dump(freq_map, fp)
     return freq_map
 
-
+@st.cache_data
 def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
     freq_map = get_word_frequencies()
     words = np.array(list(freq_map.keys()))
@@ -91,7 +103,7 @@ def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
         priors[word] = sigmoid(x)
     return priors
 
-
+@st.cache_data
 def get_true_wordle_prior():
     words = get_word_list()
     short_words = get_word_list(short=True)
@@ -201,7 +213,7 @@ def generate_pattern_matrix_in_blocks(many_words1, many_words2, block_length=CHU
 
     return block_matrix
 
-
+@st.cache_data
 def generate_full_pattern_matrix():
     words = get_word_list()
     pattern_matrix = generate_pattern_matrix_in_blocks(words, words)
@@ -336,6 +348,7 @@ def get_stats(data):
     return stats
 
 
+@st.cache_data
 def load_dict(file_name, upper=True):
     # Function to load dictionary
     if upper:
@@ -355,11 +368,11 @@ def color_char1(cell):
     if cell == '':
         return ""
     elif answer[0] == cell:
-        return f"background-color: {colors["GREEN"]}; color: white;"
+        return f"background-color: {colors['GREEN']}; color: white;"
     elif cell in answer:
-        return f"background-color: {colors["YELLOW"]}; color: white;"
+        return f"background-color: {colors['YELLOW']}; color: white;"
     else:
-        return f"background-color: {colors["GRAY"]}; color: white;"
+        return f"background-color: {colors['GRAY']}; color: white;"
 
 
 def color_char2(cell):
@@ -369,11 +382,11 @@ def color_char2(cell):
     if cell == '':
         return ""
     elif answer[1] == cell:
-        return f"background-color: {colors["GREEN"]}; color: white;"
+        return f"background-color: {colors['GREEN']}; color: white;"
     elif cell in answer:
-        return f"background-color: {colors["YELLOW"]}; color: white;"
+        return f"background-color: {colors['YELLOW']}; color: white;"
     else:
-        return f"background-color: {colors["GRAY"]}; color: white;"
+        return f"background-color: {colors['GRAY']}; color: white;"
 
 
 def color_char3(cell):
@@ -383,11 +396,11 @@ def color_char3(cell):
     if cell == '':
         return ""
     elif answer[2] == cell:
-        return f"background-color: {colors["GREEN"]}; color: white;"
+        return f"background-color: {colors['GREEN']}; color: white;"
     elif cell in answer:
-        return f"background-color: {colors["YELLOW"]}; color: white;"
+        return f"background-color: {colors['YELLOW']}; color: white;"
     else:
-        return f"background-color: {colors["GRAY"]}; color: white;"
+        return f"background-color: {colors['GRAY']}; color: white;"
 
 
 def color_char4(cell):
@@ -397,11 +410,11 @@ def color_char4(cell):
     if cell == '':
         return ""
     elif answer[3] == cell:
-        return f"background-color: {colors["GREEN"]}; color: white;"
+        return f"background-color: {colors['GREEN']}; color: white;"
     elif cell in answer:
-        return f"background-color: {colors["YELLOW"]}; color: white;"
+        return f"background-color: {colors['YELLOW']}; color: white;"
     else:
-        return f"background-color: {colors["GRAY"]}; color: white;"
+        return f"background-color: {colors['GRAY']}; color: white;"
 
 
 def color_char5(cell):
@@ -411,11 +424,11 @@ def color_char5(cell):
     if cell == '':
         return ""
     elif answer[4] == cell:
-        return f"background-color: {colors["GREEN"]}; color: white; font-size: 13px;"
+        return f"background-color: {colors['GREEN']}; color: white; font-size: 13px;"
     elif cell in answer:
-        return f"background-color: {colors["YELLOW"]}; color: white; font-size: 13px;"
+        return f"background-color: {colors['YELLOW']}; color: white; font-size: 13px;"
     else:
-        return f"background-color: {colors["GRAY"]}; color: white; font-size: 13px;"
+        return f"background-color: {colors['GRAY']}; color: white; font-size: 13px;"
 
 
 def update_unguessed(guess):
@@ -496,11 +509,10 @@ def input_guess():
 
 if st.session_state["game_over"]:
     if st.session_state["game_won"]:
-        st.success(f"Congratulations! Score: {len(st.session_state["guesses"])}/6")
+        st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
     else:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
-
 
 # Begin streamlit code:
 
@@ -517,8 +529,12 @@ with wordle:
         st.markdown(
             f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
 
-        st.dataframe(st.session_state["df"].style.applymap(color_char1, subset='0').applymap(
-            color_char2, subset='1').applymap(color_char3, subset='2').applymap(color_char4, subset='3').applymap(color_char5, subset='4'), hide_index=True)
+        st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
+                                 .map(color_char2, subset='1')
+                                 .map(color_char3, subset='2')
+                                 .map(color_char4, subset='3')
+                                 .map(color_char5, subset='4'), 
+             hide_index=True)
 
         [input, restart] = st.columns([0.7, 0.4])
 
@@ -699,12 +715,6 @@ with sentiment:
 with forest:
     st.header("🎯 Score Predictor")
     # Load datasets
-    try:
-        tweets = pd.read_csv("data/tweets.zip")
-        words = pd.read_csv("data/words_freq.csv")
-    except FileNotFoundError as e:
-        st.error(f"Error: {e}. Ensure the file paths are correct.")
-        st.stop()
     st.markdown(
     """
     Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
@@ -716,24 +726,54 @@ with forest:
         if not word.isalpha() or len(word) != 5:
             st.error("Please enter a valid 5-letter word.")
         else:
-            st.success(f"Running random forest...")
-            tweets["score"] = tweets["tweet_text"].str[11]
-            tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
-            tweets.rename(columns={"wordle_id": "day"}, inplace=True)
-            words.dropna(inplace=True)
-            words["day"] = pd.to_numeric(words['day'], errors='coerce')
-            freqs = pd.read_csv("data/letter-frequencies.csv")
-            freqs = freqs[["Letter", "English"]]
-            freqs = freqs["English"].tolist()
-            df = pd.merge(words, tweets, on='day')
-            df.drop(columns=['tweet_id'], inplace=True)
-            filename = 'data/wordle_prediction.pkl'
-            model = pickle.load(open(filename, 'rb'))
+            st.success(f"Making inference...")
+
+            @st.cache_data
+            def load_data():
+                words = pd.read_csv("data/words_freq.csv")
+                tweets = pd.read_csv("data/tweets.zip")
+                tweets["score"] = tweets["tweet_text"].str[11]
+                tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
+                tweets.rename(columns={"wordle_id": "day"}, inplace=True)
+                words.dropna(inplace=True)
+                words["day"] = pd.to_numeric(words['day'], errors='coerce')
+                freqs = pd.read_csv("data/letter-frequencies.csv")
+                freqs = freqs[["Letter", "English"]]
+                freqs = freqs["English"].tolist()
+                df = pd.merge(words, tweets, on='day')
+                df.drop(columns=['tweet_id'], inplace=True)
+                averages = df.groupby("word", as_index=False)['score'].mean()
+
+                percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
+                labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
+                chart_data = pd.DataFrame(
+                    {
+                        "Tries": labels,
+                        "Percentage": percents,
+                    }
+                )
+                countries = pd.read_csv("data/countries.csv")
+                global_cities = pd.read_csv("data/top10_global_cities.csv")
+                us_cities = pd.read_csv("data/top10_us_cities.csv")
+                states = pd.read_csv("data/states.csv")
+                return df, freqs, averages, chart_data, countries, global_cities, us_cities, states
+            df, freqs, averages, chart_data, countries, global_cities, us_cities, states = load_data()
+
+            @st.cache_resource
+            def load_model():
+                filename = 'data/wordle_prediction.pkl'
+                model = pickle.load(open(filename, 'rb'))
+                return model
+            model = load_model()
+
+
             # For any given word:
             #    1. Put the word in lower case
             #    2. Extract each letter in the word and make it it's own column
             #    3. Convert to ASCII number using ord() function
-            #    4. subtract 96 to simplify char to number representation (a = 1, b = 2, c = 3, ...)
+            #    4. subtract 97 to simplify char to number representation (a = 0, b = 1, c = 2, ...)
+            #    5. Use number representation as index in frequency array
+
             def predict_score(word):
                 if (not word.isalpha() or len(word) != 5):
                     raise Exception(
@@ -752,7 +792,7 @@ with forest:
                                 freqs[df["letter_5"][0]]
                 df.drop(columns=["word"], inplace=True)
                 return model.predict(df)
-            averages = df.groupby("word", as_index=False)['score'].mean()
+            
             prediction = predict_score(word)
             # If word isn't found in tweet data, None is returned for the average score
             average = None
@@ -780,21 +820,11 @@ with forest:
                 st.subheader("🥳 Streak savior!")
                 st.markdown("The average Wordle score is **3.83**. Looks like the average person should be able to figure this one out.")
             st.markdown("**Refer to the chart below to see the percentage breakdown for the results of every Wordle game!**")
-            percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
-            labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
-            chart_data = pd.DataFrame(
-                {
-                    "Tries": labels,
-                    "Percentage": percents,
-                }
-            )
+
             c = alt.Chart(chart_data).mark_bar().encode(x='Tries', y='Percentage')
             st.altair_chart(c, use_container_width=True) 
             st.subheader("🌎 Your word vs. the world")
-            countries = pd.read_csv("data/countries.csv")
-            global_cities = pd.read_csv("data/top10_global_cities.csv")
-            us_cities = pd.read_csv("data/top10_us_cities.csv")
-            states = pd.read_csv("data/states.csv")
+
             def get_bounds(scores, names, prediction):
                 if prediction > max(scores):
                     return None, float('inf')
@@ -812,6 +842,7 @@ with forest:
                     if scores[i] < prediction and scores[i] > lower:
                         lower = i
                 return higher, lower
+
             st.markdown("### Global ranking")
             st.markdown("The below chart shows a map of the world organized by the **average scores of each country**.")
             names = countries["Country"].tolist()
