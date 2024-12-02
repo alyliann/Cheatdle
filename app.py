@@ -12,6 +12,10 @@ import pickle
 import altair as alt
 import plotly.express as px
 import logging
+
+# Configure logging
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 from langchain.document_loaders import PyPDFLoader
 import torch
@@ -20,6 +24,16 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
+
+# Define or import DocumentProcessor class
+class DocumentProcessor:
+    def __init__(self, pdf_path):
+        self.pdf_path = pdf_path
+        # Initialize other necessary attributes
+
+    def get_qa_chain(self):
+        # Implement the method to return a QA chain
+        pass
 
 
 st.set_page_config(
@@ -511,71 +525,6 @@ if st.session_state["game_over"]:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
-load_dotenv()
-api_key = st.secrets["OPENAI_API_KEY"]
-
-# GPU Memory Management
-def clear_gpu_memory():
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    gc.collect()
-
-# Document Processor Class for QA System
-class DocumentProcessor:
-    def __init__(self, pdf_path: str):
-        self.pdf_path = pdf_path
-        self._qa_chain = None
-        self._vectorstore = None
-        
-    @st.cache_resource(ttl=3600)
-    def load_and_process_document(self):
-        try:
-            if not os.path.exists(self.pdf_path):
-                raise FileNotFoundError(f"PDF not found at: {self.pdf_path}")
-            loader = PyPDFLoader(self.pdf_path)
-            pages = loader.load()
-            embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L12-v2",
-                model_kwargs={'device': 'cpu', 'normalize_embeddings': True},
-                encode_kwargs={'batch_size': 32, 'show_progress_bar': False}
-            )
-            vectorstore = FAISS.from_documents(documents=pages, embedding=embeddings)
-            clear_gpu_memory()
-            return vectorstore
-        except Exception as e:
-            logger.error(f"Error processing document: {str(e)}")
-            return None
-
-    def get_qa_chain(self):
-        try:
-            if self._vectorstore is None:
-                self._vectorstore = self.load_and_process_document()
-            if self._vectorstore is None:
-                return None
-            llm = ChatOpenAI(
-                temperature=0.7,
-                api_key=api_key,
-                model="gpt-3.5-turbo",
-                max_tokens=100,
-                request_timeout=30,
-            )
-            self._qa_chain = RetrievalQA.from_chain_type(
-                llm=llm,
-                chain_type="stuff",
-                retriever=self._vectorstore.as_retriever(search_kwargs={"k": 3}),
-            )
-            return self._qa_chain
-        except Exception as e:
-            logger.error(f"Error creating QA chain: {str(e)}")
-            return None
-
-# Begin streamlit code:
-
 wordle, sentiment, forest, rag = st.tabs(["Wordle", "Sentiment", "Forest", "RAG"])
 
 with wordle:
@@ -954,45 +903,59 @@ with forest:
 
 with rag:
     st.title("Wordle Final Project QA System")
+
+    # Initialize the DocumentProcessor only once
     if "processor" not in st.session_state:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         pdf_path = os.path.join(script_dir, "data/CTP Project Design Doc (3).pdf")
         st.session_state.processor = DocumentProcessor(pdf_path)
 
     try:
+        # Attempt to load the QA chain
         with st.spinner("Loading QA system..."):
             qa_chain = st.session_state.processor.get_qa_chain()
             if qa_chain is None:
-                st.error("Failed to initialize QA system. Please try again.")
+                st.error("Failed to initialize the QA system. Please check your PDF path or embeddings setup.")
                 st.stop()
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        logger.error(f"Error during QA system initialization: {str(e)}")
+        st.error(f"Unexpected error: {str(e)}. Please try again.")
         st.stop()
 
-    # Chat history and input
+    # Manage chat history using session state
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+    # Input for user queries
     prompt = st.chat_input("Ask a question about the Wordle Final Project")
     if prompt:
         try:
+            # Display user message in chat
             with st.chat_message("user"):
                 st.markdown(prompt)
+
+            # Add the user's message to the session state
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.spinner("Searching document..."):
+
+            # Process the query and retrieve a response
+            with st.spinner("Searching the document..."):
                 response = qa_chain.invoke(prompt)
+
+            # Display assistant's response in chat
             with st.chat_message("assistant"):
                 st.markdown(response["result"])
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response["result"]}
-            )
-            clear_gpu_memory()
-        except Exception as e:
-            st.error(f"Error processing question: {str(e)}")
-            logger.error(f"Query processing error: {str(e)}")
 
-# Wordle, Sentiment, Forest tabs remain unchanged.
+            # Add the assistant's message to the session state
+            st.session_state.messages.append({"role": "assistant", "content": response["result"]})
+
+            # Clear GPU memory after processing
+            torch.cuda.empty_cache()
+            gc.collect()
+        except Exception as e:
+            logger.error(f"Error processing the query: {str(e)}")
+            st.error(f"An error occurred while processing your query: {str(e)}. Please try again.")
