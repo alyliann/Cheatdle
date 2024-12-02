@@ -55,6 +55,7 @@ def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 
+@st.cache_data
 def get_word_list(short=False):
     result = []
     file = SHORT_WORD_LIST_FILE if short else LONG_WORD_LIST_FILE
@@ -62,7 +63,7 @@ def get_word_list(short=False):
         result.extend([word.strip().upper() for word in fp.readlines()])
     return result
 
-
+@st.cache_data
 def get_word_frequencies(regenerate=False):
     if os.path.exists('data/freq_map.json') or regenerate:
         with open('data/freq_map.json') as fp:
@@ -83,7 +84,7 @@ def get_word_frequencies(regenerate=False):
         json.dump(freq_map, fp)
     return freq_map
 
-
+@st.cache_data
 def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
     freq_map = get_word_frequencies()
     words = np.array(list(freq_map.keys()))
@@ -102,7 +103,7 @@ def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
         priors[word] = sigmoid(x)
     return priors
 
-
+@st.cache_data
 def get_true_wordle_prior():
     words = get_word_list()
     short_words = get_word_list(short=True)
@@ -212,7 +213,7 @@ def generate_pattern_matrix_in_blocks(many_words1, many_words2, block_length=CHU
 
     return block_matrix
 
-
+@st.cache_data
 def generate_full_pattern_matrix():
     words = get_word_list()
     pattern_matrix = generate_pattern_matrix_in_blocks(words, words)
@@ -347,6 +348,7 @@ def get_stats(data):
     return stats
 
 
+@st.cache_data
 def load_dict(file_name, upper=True):
     # Function to load dictionary
     if upper:
