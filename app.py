@@ -11,30 +11,17 @@ from scipy.stats import entropy
 import pickle
 import altair as alt
 import plotly.express as px
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # Updated import
+from langchain.chains import RetrievalQA
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import gc
+import torch
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.ERROR)
-logger = logging.getLogger(__name__)
-from dotenv import load_dotenv
-from langchain.document_loaders import PyPDFLoader
-import torch
-import gc
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
-from langchain_openai import ChatOpenAI
-from langchain.chains import RetrievalQA
-
-# Define or import DocumentProcessor class
-class DocumentProcessor:
-    def __init__(self, pdf_path):
-        self.pdf_path = pdf_path
-        # Initialize other necessary attributes
-
-    def get_qa_chain(self):
-        # Implement the method to return a QA chain
-        pass
-
+# Existing imports, plus new RAG-specific imports
 
 st.set_page_config(
     page_title="Cheatdle",
@@ -525,6 +512,97 @@ if st.session_state["game_over"]:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
 
+
+# Load Environment Variables
+load_dotenv()
+api_key = st.secrets["OPENAI_API_KEY"]
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# Streamlit Configuration
+st.set_page_config(
+    page_title="Cheatdle: Wordle Analyzer",
+    page_icon="🟩",
+    layout="wide"
+)
+
+# Display App Logo
+st.logo('captures/cheatdle.png')
+
+# Helper Function for Wordle Optimization
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
+def initialize_qa_chain():
+    """
+    Initializes the QA Chain for analyzing the Wordle Design Document.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_path = os.path.join(script_dir, "data/CTP Project Design Doc (3).pdf")
+
+    # Ensure PDF file exists
+    if not os.path.exists(pdf_path):
+        st.error(f"PDF file not found at: {pdf_path}")
+        st.stop()
+
+    # Load PDF and create embeddings
+    loader = PyPDFLoader(pdf_path)
+    pages = loader.load()
+    embeddings = HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L12-v2",
+        model_kwargs={'device': 'cpu'}
+    )
+
+    # Create Vector Store
+    vector_store = FAISS.from_documents(pages, embeddings)
+
+    # Initialize ChatOpenAI
+    llm = ChatOpenAI(
+        temperature=0.7,
+        api_key=api_key,
+        model="gpt-3.5-turbo",
+        max_tokens=100,
+    )
+
+    # Build RetrievalQA Chain
+    return RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vector_store.as_retriever(),
+    )
+
+
+@st.cache_resource
+def load_model(file_path):
+    """
+    Loads a pretrained model from file.
+    """
+    with open(file_path, 'rb') as file:
+        return pickle.load(file)
+
+
+@st.cache_resource
+def load_data():
+    """
+    Loads necessary datasets for Wordle analysis.
+    """
+    words_freq = pd.read_csv("data/words_freq.csv")
+    tweets = pd.read_csv("data/tweets.zip")
+    freqs = pd.read_csv("data/letter-frequencies.csv")["English"].tolist()
+    averages = tweets.groupby("word", as_index=False)['score'].mean()
+    return words_freq, tweets, freqs, averages
+
+
+# Initialize QA Chain
+try:
+    qa_chain = initialize_qa_chain()
+    st.success("QA Chain initialized successfully!")
+except Exception as e:
+    st.error(f"Failed to initialize QA Chain: {e}")
+    st.stop()
+
+# Begin streamlit code:
+
 wordle, sentiment, forest, rag = st.tabs(["Wordle", "Sentiment", "Forest", "RAG"])
 
 with wordle:
@@ -901,61 +979,139 @@ with forest:
             c = alt.Chart(us_cities).mark_bar().encode(x=alt.X('Score:Q', scale=alt.Scale(domain=(3.5, 3.67), clamp=True)), y=alt.Y('City:O').sort('x'))
             st.altair_chart(c.properties(height = 500), use_container_width=True) 
 
-with rag:
-    st.title("Wordle Final Project QA System")
 
-    # Initialize the DocumentProcessor only once
+with rag:
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    # Load environment variables
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    # Memory management function
+    def clear_gpu_memory():
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+    class DocumentProcessor:
+        def __init__(self, pdf_path: str):
+            self.pdf_path = pdf_path
+            self._qa_chain = None
+            self._vectorstore = None
+            
+        @st.cache_resource(ttl=3600)
+        def load_and_process_document(self):
+            try:
+                if not os.path.exists(self.pdf_path):
+                    raise FileNotFoundError(f"PDF not found at: {self.pdf_path}")
+                
+                loader = PyPDFLoader(self.pdf_path)
+                pages = loader.load()
+                
+                embeddings = HuggingFaceEmbeddings(
+                    model_name="all-MiniLM-L12-v2",
+                    model_kwargs={
+                        'device': 'cpu',
+                        'normalize_embeddings': True
+                    },
+                    encode_kwargs={
+                        'batch_size': 32,
+                        'show_progress_bar': False
+                    }
+                )
+                
+                vectorstore = FAISS.from_documents(
+                    documents=pages,
+                    embedding=embeddings,
+                )
+                
+                clear_gpu_memory()
+                return vectorstore
+                
+            except Exception as e:
+                logger.error(f"Error processing document: {str(e)}")
+                return None
+
+        def get_qa_chain(self):
+            try:
+                if self._vectorstore is None:
+                    self._vectorstore = self.load_and_process_document()
+                    
+                if self._vectorstore is None:
+                    return None
+                    
+                llm = ChatOpenAI(
+                    temperature=0.7,
+                    api_key=api_key,
+                    model="gpt-3.5-turbo",
+                    max_tokens=100,
+                    request_timeout=30,
+                )
+                
+                self._qa_chain = RetrievalQA.from_chain_type(
+                    llm=llm,
+                    chain_type="stuff",
+                    retriever=self._vectorstore.as_retriever(
+                        search_kwargs={"k": 3}
+                    ),
+                )
+                
+                return self._qa_chain
+                
+            except Exception as e:
+                logger.error(f"Error creating QA chain: {str(e)}")
+                return None
+
+    # Initialize session state for RAG
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
     if "processor" not in st.session_state:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         pdf_path = os.path.join(script_dir, "data/CTP Project Design Doc (3).pdf")
         st.session_state.processor = DocumentProcessor(pdf_path)
 
+    st.title("Ask about our Wordle Final Project")
+    
     try:
-        # Attempt to load the QA chain
         with st.spinner("Loading QA system..."):
             qa_chain = st.session_state.processor.get_qa_chain()
             if qa_chain is None:
-                st.error("Failed to initialize the QA system. Please check your PDF path or embeddings setup.")
+                st.error("Failed to initialize QA system. Please try again.")
                 st.stop()
     except Exception as e:
-        logger.error(f"Error during QA system initialization: {str(e)}")
-        st.error(f"Unexpected error: {str(e)}. Please try again.")
+        st.error(f"Error: {str(e)}")
         st.stop()
-
-    # Manage chat history using session state
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
 
     # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Input for user queries
+    # Chat input
     prompt = st.chat_input("Ask a question about the Wordle Final Project")
+
     if prompt:
         try:
-            # Display user message in chat
             with st.chat_message("user"):
                 st.markdown(prompt)
-
-            # Add the user's message to the session state
+            
             st.session_state.messages.append({"role": "user", "content": prompt})
-
-            # Process the query and retrieve a response
-            with st.spinner("Searching the document..."):
+            
+            with st.spinner("Searching document..."):
                 response = qa_chain.invoke(prompt)
-
-            # Display assistant's response in chat
+                
             with st.chat_message("assistant"):
                 st.markdown(response["result"])
-
-            # Add the assistant's message to the session state
-            st.session_state.messages.append({"role": "assistant", "content": response["result"]})
-
-            # Clear GPU memory after processing
-            torch.cuda.empty_cache()
-            gc.collect()
+                
+            st.session_state.messages.append(
+                {"role": "assistant", "content": response["result"]}
+            )
+            
+            # Clear memory after processing
+            clear_gpu_memory()
+            
         except Exception as e:
-            logger.error(f"Error processing the query: {str(e)}")
-            st.error(f"An error occurred while processing your query: {str(e)}. Please try again.")
+            st.error(f"Error processing question: {str(e)}")
+            logger.error(f"Query processing error: {str(e)}")
