@@ -125,7 +125,9 @@ python -m ensurepip --upgrade
 5. In the project's root directory, create a `.env` file with the following contents:
    ```
    OPENAI_API_KEY=sk-your_api_key_here
-   ``` 
+   ```
+**NOTE:** This repository contains a different implementation of Cheatdle without Pygame or the RAG included, due to memory limitations on Streamlit Community Cloud.
+If you would like to use a version that contains all features and a Pygame implementation of Wordle in one app, refer to the fork `luna-cheatdle`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -134,15 +136,31 @@ python -m ensurepip --upgrade
 ## Usage
 
 ### Wordle Solver
+1. Enter your valid five-letter Wordle guess into the input prompt.
+2. The game boxes with the guess information, the right entropy table, and the below list of candidate answers will update.
+3. Repeat until the game is won or lost, and restart with a new word, if desired.
+
 ![image](https://github.com/user-attachments/assets/74004d6c-73d1-4ee8-8ecc-be0d93a828cb)
 
 ### Wordle Score Predictor
+1. Enter your five-letter Wordle guess into the input prompt.
+2. The model will predict the average score it will take for the general public to guess.
+3. You can view guess statistics, and the app will compare it with the generated inference.
+
 ![image](https://github.com/user-attachments/assets/6b986326-ea85-491e-a708-8c822d67a6e6)
 
 ### Wordle Answer Sentiment Analysis
+1. Enter your valid five-letter Wordle guess into the input prompt.
+2. If the word you entered is in the tweet dataset, it will use tweets with that word to generate sentiment analysis.
+3. You can also view the sentiment analysis as the average in chart form, or as a breakdown of all sentiments.
+
 ![image](https://github.com/user-attachments/assets/80cc87bf-f93c-443b-b6f1-fa74e752d8ec)
 
 ### Cheatdle Project RAG
+1. Enter any prompt related to the Cheatdle project.
+2. The RAG will scan the design document and create a response.
+3. That response will be added to the text log, which will update and be displayed to the user.
+
 ![image](https://github.com/user-attachments/assets/63c00a0d-0329-4266-8cd3-c233fb5fd42d)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
