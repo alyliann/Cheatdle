@@ -11,7 +11,6 @@ import streamlit as st
 import itertools as it
 from datetime import datetime
 from scipy.stats import entropy
-from streamlit_extras.stylable_container import stylable_container
 
 st.set_page_config(
     page_title="Cheatdle",
