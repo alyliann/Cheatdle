@@ -361,6 +361,7 @@ if "guesses" not in st.session_state:
     st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
     st.session_state["guesses"] = []
     st.session_state["input"] = ""
+    st.session_state["answer_type"] = 'Random'
     st.session_state["answer"] = random.choice(
         st.session_state["DICT_ANSWERS"])
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -460,55 +461,71 @@ if st.session_state["game_over"]:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
 
-[button1, button2, button3] = st.columns([0.3, 0.3, 0.3])
 
-with button1:
+# Streamlit top button styling code:
+
+[today, yesterday, rand] = st.columns([0.4, 0.4, 0.2])
+
+with today:
     with stylable_container(
         # Styling for today button
         "today",
         css_styles="""
         button {
             background-color: #06d6a0;
+            border-color: #03ad81;
             color: #464650;
         }""",
     ):
-        button1_clicked = st.button("Today's Wordle", key="today")
-with button2:
+        today_clicked = st.button("Today's Wordle", key="today")
+with yesterday:
     with stylable_container(
         # Styling for yesterday button
         "yesterday",
         css_styles="""
         button {
             background-color: #464650;
+            border-color: #2e2e38;
             color: white;
         }""",
     ):
-        button2_clicked = st.button("Yesterday's Wordle", key="yesterday")
-with button3:
+        yesterday_clicked = st.button("Yesterday's Wordle", key="yesterday")
+with rand:
     with stylable_container(
         # Styling for random button
         "random",
         css_styles="""
         button {
             background-color: #ffd166;
+            border-color: #ebba4b;
             color: #464650;
         }""",
     ):
-        button3_clicked = st.button("Random", key="random")
+        random_clicked = st.button("Random", key="random")
 
-# Check button states and print messages
-if button1_clicked:
-    st.write("Button 1 pressed")
-elif button2_clicked:
-    st.write("Button 2 pressed")
-elif button3_clicked:
-    st.write("Button 3 pressed")
+# Check button states and change answer accordingly
+if today_clicked:
+    st.session_state["answer"] = 'TODAY'
+    st.session_state["answer_type"] = 'Today\'s'
+    st.write(f"Answer: {st.session_state["answer"]}")
+elif yesterday_clicked:
+    st.session_state["answer"] = 'SHARP'
+    st.session_state["answer_type"] = 'Yesterday\'s'
+    st.write(f"Answer: {st.session_state["answer"]}")
+elif random_clicked:
+    st.session_state["answer"] = random.choice(
+        st.session_state["DICT_ANSWERS"])
+    st.session_state["answer_type"] = 'Random'
+    st.write(f"Answer: {st.session_state["answer"]}")
+
+
+# Remaining Streamlit code
 
 [wordle, empty, stats] = st.columns([0.5, 0.1, 0.4])
 
 with wordle:
-    
-    st.subheader("Wordle")
+
+    st.subheader(f"{st.session_state["answer_type"]} Wordle")
 
     frame = render_frame()
     frame_image = Image.fromarray(frame)
@@ -541,7 +558,7 @@ with wordle:
             st.session_state["guesses"] = []
             st.session_state["input"] = ""
             st.session_state["answer"] = random.choice(
-                st.session_state["DICT_ANSWERS"])
+                st.session_state["DICT_ANSWERS"]) if st.session_state["answer_type"] == 'Random' else st.session_state["answer"]
             st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             st.session_state["game_over"] = False
             st.session_state["game_won"] = False
