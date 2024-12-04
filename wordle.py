@@ -9,6 +9,7 @@ from PIL import Image
 import streamlit as st
 import itertools as it
 from scipy.stats import entropy
+from streamlit_extras.stylable_container import stylable_container
 
 st.set_page_config(
     page_title="Cheatdle",
@@ -416,6 +417,7 @@ def draw_guesses(surface):
             x += SQ_SIZE + MARGIN
         y += SQ_SIZE + MARGIN
 
+
 # Begin Streamlit code:
 
 
@@ -458,9 +460,54 @@ if st.session_state["game_over"]:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
 
+[button1, button2, button3] = st.columns([0.3, 0.3, 0.3])
+
+with button1:
+    with stylable_container(
+        # Styling for today button
+        "today",
+        css_styles="""
+        button {
+            background-color: #06d6a0;
+            color: #464650;
+        }""",
+    ):
+        button1_clicked = st.button("Today's Wordle", key="today")
+with button2:
+    with stylable_container(
+        # Styling for yesterday button
+        "yesterday",
+        css_styles="""
+        button {
+            background-color: #464650;
+            color: white;
+        }""",
+    ):
+        button2_clicked = st.button("Yesterday's Wordle", key="yesterday")
+with button3:
+    with stylable_container(
+        # Styling for random button
+        "random",
+        css_styles="""
+        button {
+            background-color: #ffd166;
+            color: #464650;
+        }""",
+    ):
+        button3_clicked = st.button("Random", key="random")
+
+# Check button states and print messages
+if button1_clicked:
+    st.write("Button 1 pressed")
+elif button2_clicked:
+    st.write("Button 2 pressed")
+elif button3_clicked:
+    st.write("Button 3 pressed")
+
 [wordle, empty, stats] = st.columns([0.5, 0.1, 0.4])
 
 with wordle:
+    
     st.subheader("Wordle")
 
     frame = render_frame()
@@ -477,22 +524,20 @@ with wordle:
                           key='guess', on_change=input_guess).upper()
 
     with restart:
-        m = st.markdown("""
-            <style>
-            div.stButton > button:first-child {
+        with stylable_container(
+            # Styling for restart button
+            "restart",
+            css_styles="""
+            button {
                 background-color: #eb4242;
+                color: white;
                 border-color: #eb4242;
-                color: #ffffff;
-                margin-top: 0.7rem;
-            }
-            div.stButton > button:hover {
-                background-color: #c22121;
-                border-color: #c22121;
-                color: #ffffff;
-                }
-            </style>""", unsafe_allow_html=True)
+                margin-top: 1.75rem;
+            }""",
+        ):
+            restart_clicked = st.button("Restart Game", key="restart")
 
-        if st.button("Restart Game"):
+        if restart_clicked:
             st.session_state["guesses"] = []
             st.session_state["input"] = ""
             st.session_state["answer"] = random.choice(
