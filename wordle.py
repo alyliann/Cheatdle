@@ -6,8 +6,10 @@ import random
 import numpy as np
 import pandas as pd
 from PIL import Image
+import datetime as dt
 import streamlit as st
 import itertools as it
+from datetime import datetime
 from scipy.stats import entropy
 from streamlit_extras.stylable_container import stylable_container
 
@@ -361,9 +363,10 @@ if "guesses" not in st.session_state:
     st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
     st.session_state["guesses"] = []
     st.session_state["input"] = ""
-    st.session_state["answer_type"] = 'Random'
     st.session_state["answer"] = random.choice(
         st.session_state["DICT_ANSWERS"])
+    st.session_state["answer_date"] = None
+    st.session_state["all_wordles"] = None
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     st.session_state["game_over"] = False
     st.session_state["priors"] = get_frequency_based_priors()
@@ -421,7 +424,6 @@ def draw_guesses(surface):
 
 # Begin Streamlit code:
 
-
 def render_frame():
     surface = pygame.Surface((WIDTH, HEIGHT))
     surface.fill("white")
@@ -431,8 +433,61 @@ def render_frame():
     return pygame.surfarray.array3d(surface).swapaxes(0, 1)
 
 
+def get_wordle_by_date():
+    if st.session_state["answer_date"]:
+        if not st.session_state["all_wordles"]:
+            # initialize all_wordles dict to refer back to throughout session
+            if os.path.exists('data/all_wordles.json'):
+                with open('data/all_wordles.json') as fp:
+                    # load json of all past wordles and their date of occurence
+                    st.session_state["all_wordles"] = json.load(fp)
+                    return get_wordle_by_date()
+            else:
+                st.error(
+                    f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
+        else:
+            if st.session_state["answer_date"] in st.session_state["all_wordles"]:
+                return st.session_state["all_wordles"][st.session_state["answer_date"]]
+            else:
+                # if date not found in dict
+                selected = datetime.strptime(
+                    st.session_state["answer_date"], '%Y-%m-%d').date()
+                latest = datetime.strptime(
+                    next(iter(st.session_state["all_wordles"])), '%Y-%m-%d').date()
+                if selected > latest:
+                    st.error(
+                        f'We\'re so sorry! The last time this project was updated was {latest.strftime(' % B % -d, % Y')}. We randomized the answer instead.')
+                else:
+                    st.error(
+                        f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
+    if st.session_state["answer_date"]:
+        # if date not found in all_wordles dict
+        st.session_state["answer_date"] = None
+    # if date not provided or error encountered preventing date-wordle matching:
+    return random.choice(st.session_state["DICT_ANSWERS"])
+
+
 def rerun():
-    st.write("")  # originally st.rerun(), which triggers a warning
+    # replaces st.rerun(), which triggers a warning in callbacks
+    st.write("")  # reloads page
+
+
+def reset_game():
+    st.session_state["guesses"] = []
+    st.session_state["input"] = ""
+    st.session_state["answer"] = random.choice(
+        st.session_state["DICT_ANSWERS"]) if not st.session_state["answer_date"] else get_wordle_by_date()
+    st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    st.session_state["game_over"] = False
+    st.session_state["game_won"] = False
+    st.session_state["priors"] = get_frequency_based_priors()
+    st.session_state["next_guess_map"] = {}
+    st.session_state["patterns"] = []
+    st.session_state["possibilities"] = list(
+        filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
+    # Default guess suggestions:
+    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
+        "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
 
 
 def input_guess():
@@ -454,6 +509,17 @@ def input_guess():
     rerun()
 
 
+def update_answer():
+    if st.session_state.date:
+        st.session_state["answer_date"] = st.session_state.date.strftime(
+            '%Y-%m-%d')  # Format as 'YYYY-mm-dd' string
+    else:
+        st.session_state["answer_date"] = None
+    st.session_state["answer"] = get_wordle_by_date()
+    reset_game()
+    # st.write(st.session_state["answer_date"], st.session_state["answer"])  # for testing
+
+
 if st.session_state["game_over"]:
     if st.session_state["game_won"]:
         st.success(f"Congratulations! Score: {len(st.session_state["guesses"])}/6")
@@ -462,70 +528,21 @@ if st.session_state["game_over"]:
             f"Game Over! The correct word was {st.session_state['answer']}")
 
 
-# Streamlit top button styling code:
+# Streamlit top buttons code:
 
-[today, yesterday, rand] = st.columns([0.4, 0.4, 0.2])
+[date, empty] = st.columns([0.4, 0.6])
 
-with today:
-    with stylable_container(
-        # Styling for today button
-        "today",
-        css_styles="""
-        button {
-            background-color: #06d6a0;
-            border-color: #03ad81;
-            color: #464650;
-        }""",
-    ):
-        today_clicked = st.button("Today's Wordle", key="today")
-with yesterday:
-    with stylable_container(
-        # Styling for yesterday button
-        "yesterday",
-        css_styles="""
-        button {
-            background-color: #464650;
-            border-color: #2e2e38;
-            color: white;
-        }""",
-    ):
-        yesterday_clicked = st.button("Yesterday's Wordle", key="yesterday")
-with rand:
-    with stylable_container(
-        # Styling for random button
-        "random",
-        css_styles="""
-        button {
-            background-color: #ffd166;
-            border-color: #ebba4b;
-            color: #464650;
-        }""",
-    ):
-        random_clicked = st.button("Random", key="random")
-
-# Check button states and change answer accordingly
-if today_clicked:
-    st.session_state["answer"] = 'TODAY'
-    st.session_state["answer_type"] = 'Today\'s'
-    st.write(f"Answer: {st.session_state["answer"]}")
-elif yesterday_clicked:
-    st.session_state["answer"] = 'SHARP'
-    st.session_state["answer_type"] = 'Yesterday\'s'
-    st.write(f"Answer: {st.session_state["answer"]}")
-elif random_clicked:
-    st.session_state["answer"] = random.choice(
-        st.session_state["DICT_ANSWERS"])
-    st.session_state["answer_type"] = 'Random'
-    st.write(f"Answer: {st.session_state["answer"]}")
-
+with date:
+    st.date_input('Select Wordle (Random if unspecified)', value=None, min_value=dt.date(
+        2021, 6, 19), max_value=dt.date.today(), format='MM/DD/YYYY', key='date', on_change=update_answer)
 
 # Remaining Streamlit code
 
 [wordle, empty, stats] = st.columns([0.5, 0.1, 0.4])
 
 with wordle:
-
-    st.subheader(f"{st.session_state["answer_type"]} Wordle")
+    wordle_type = st.session_state["answer_date"] if st.session_state["answer_date"] else 'Random'
+    st.subheader(f"{wordle_type} Wordle")
 
     frame = render_frame()
     frame_image = Image.fromarray(frame)
@@ -541,35 +558,23 @@ with wordle:
                           key='guess', on_change=input_guess).upper()
 
     with restart:
-        with stylable_container(
-            # Styling for restart button
-            "restart",
-            css_styles="""
-            button {
+        m = st.markdown("""
+            <style>
+            div.stButton > button:first-child {
                 background-color: #eb4242;
-                color: white;
                 border-color: #eb4242;
-                margin-top: 1.75rem;
-            }""",
-        ):
-            restart_clicked = st.button("Restart Game", key="restart")
+                color: #ffffff;
+                margin-top: 0.7rem;
+            }
+            div.stButton > button:hover {
+                background-color: #c22121;
+                border-color: #c22121;
+                color: #ffffff;
+                }
+            </style>""", unsafe_allow_html=True)
 
-        if restart_clicked:
-            st.session_state["guesses"] = []
-            st.session_state["input"] = ""
-            st.session_state["answer"] = random.choice(
-                st.session_state["DICT_ANSWERS"]) if st.session_state["answer_type"] == 'Random' else st.session_state["answer"]
-            st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            st.session_state["game_over"] = False
-            st.session_state["game_won"] = False
-            st.session_state["priors"] = get_frequency_based_priors()
-            st.session_state["next_guess_map"] = {}
-            st.session_state["patterns"] = []
-            st.session_state["possibilities"] = list(
-                filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
-            # Default guess suggestions:
-            st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
-                "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
+        if st.button("Restart Game"):
+            reset_game()
             st.rerun()
 
 with stats:
