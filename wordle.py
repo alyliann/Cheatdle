@@ -515,7 +515,6 @@ def update_answer():
         st.session_state["answer_date"] = None
     st.session_state["answer"] = get_wordle_by_date()
     reset_game()
-    # st.write(st.session_state["answer_date"], st.session_state["answer"])  # for testing
 
 
 if st.session_state["game_over"]:
