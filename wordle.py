@@ -294,8 +294,11 @@ def get_next_guess(guesses, patterns, possibilities):
     )
     if phash not in st.session_state["next_guess_map"]:
         choices = st.session_state["DICT_ANSWERS"]
+        if st.session_state["hard_mode"]:
+            for guess, pattern in zip(guesses, patterns):
+                choices = get_possible_words(guess, pattern, choices)
         st.session_state["next_guess_map"][phash] = optimal_guess(
-            choices, possibilities, st.session_state["priors"]
+        choices, possibilities, st.session_state["priors"]
         )
 
 
@@ -367,7 +370,10 @@ if "guesses" not in st.session_state:
     st.session_state["answer_date"] = None
     st.session_state["all_wordles"] = None
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    st.session_state["found"] = ''
     st.session_state["game_over"] = False
+    st.session_state["game_won"] = False
+    st.session_state["hard_mode"] = False
     st.session_state["priors"] = get_frequency_based_priors()
     st.session_state["next_guess_map"] = {}
     st.session_state["patterns"] = []
@@ -419,6 +425,48 @@ def draw_guesses(surface):
 
             x += SQ_SIZE + MARGIN
         y += SQ_SIZE + MARGIN
+
+
+def update_unguessed(guess):
+    # Updates string of all unguessed letters
+    return "".join([letter for letter in st.session_state["unguessed"] if letter not in guess])
+
+
+def update_found(guess):
+    # Updates string of all found letters
+    found = st.session_state["found"]
+    for c in guess:
+        if c not in found and c in st.session_state["answer"]:
+            found += c
+    return "".join(sorted(found))
+
+
+def is_valid_hard_mode_guess(guess):
+    """
+    Validates if a guess follows hard mode rules:
+    - Must include all previously found letters
+    - Must not include any previously ruled out letters
+    """
+    # Check if the guess contains all found letters
+    for letter in st.session_state["found"]:
+        if letter not in guess:
+            return False, f"Hard mode: Must use found letter '{letter}'"
+
+    # Check if the guess contains any ruled out letters
+    # Only check letters that have been ruled out by previous guesses
+    if len(st.session_state["guesses"]) > 0:  # Only check after first guess
+        for letter in guess:
+            # A letter is ruled out if:
+            # 1. It's not in any previously found letters AND
+            # 2. It was used in a previous guess (so it's not in unguessed anymore) AND
+            # 3. It's not in the answer
+            if (letter not in st.session_state["found"] and  # not found
+                # was used before
+                letter not in st.session_state["unguessed"] and
+                    letter not in st.session_state["answer"]):  # not in answer
+                return False, f"Hard mode: Cannot use ruled out letter '{letter}'"
+
+    return True, ""
 
 
 # Begin Streamlit code:
@@ -476,6 +524,7 @@ def reset_game():
     st.session_state["answer"] = random.choice(
         st.session_state["DICT_ANSWERS"]) if not st.session_state["answer_date"] else get_wordle_by_date()
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    st.session_state["found"] = ''
     st.session_state["game_over"] = False
     st.session_state["game_won"] = False
     st.session_state["priors"] = get_frequency_based_priors()
@@ -490,21 +539,33 @@ def reset_game():
 
 def input_guess():
     guess = st.session_state.guess.upper()
-    if len(guess) == 5:
-        if guess in st.session_state["DICT_GUESSING"]:
-            st.session_state["guesses"].append(guess)
-            st.session_state["unguessed"] = determine_unguessed_letters(
-                st.session_state["guesses"])
-            st.session_state["game_over"] = (
-                guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
-            st.session_state["game_won"] = guess == st.session_state["answer"]
 
-        else:
-            st.error("Please enter a valid guess.")
-    else:
+    if len(guess) != 5:
         st.error("Please enter a 5-letter word.")
-    st.session_state.guess = ""
-    rerun()
+        st.session_state.guess = ''
+        return
+
+    if guess not in st.session_state["DICT_GUESSING"]:
+        st.error("Please enter a valid guess.")
+        st.session_state.guess = ''
+        return
+
+    if st.session_state["hard_mode"]:
+        is_valid, error_msg = is_valid_hard_mode_guess(guess)
+        if not is_valid:
+            st.error(error_msg)
+            st.session_state.guess = ''
+            return
+
+    st.session_state["guesses"].append(guess)
+    n = len(st.session_state["guesses"])
+    st.session_state["unguessed"] = update_unguessed(guess)
+    st.session_state["found"] = update_found(guess)
+
+    st.session_state["game_over"] = (
+        guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
+    st.session_state["game_won"] = guess == st.session_state["answer"]
+    st.session_state.guess = ''
 
 
 def update_answer():
@@ -514,6 +575,14 @@ def update_answer():
     else:
         st.session_state["answer_date"] = None
     st.session_state["answer"] = get_wordle_by_date()
+    reset_game()
+
+
+def update_mode():
+    if st.session_state.hard:
+        st.session_state["hard_mode"] = True
+    else:
+        st.session_state["hard_mode"] = False
     reset_game()
 
 
@@ -527,11 +596,17 @@ if st.session_state["game_over"]:
 
 # Streamlit top buttons code:
 
-[date, empty] = st.columns([0.4, 0.6])
+[date, empty, mode] = st.columns([0.4, 0.1, 0.5])
 
 with date:
     st.date_input('Select Wordle (Random if unspecified)', value=None, min_value=dt.date(
         2021, 6, 19), max_value=dt.date.today(), format='MM/DD/YYYY', key='date', on_change=update_answer)
+
+with mode:
+    st.write('')
+    st.write('')
+    st.checkbox("Hard Mode", key="hard",
+                help="In hard mode, you must use all discovered letters and cannot use ruled out letters", on_change=update_mode)
 
 # Remaining Streamlit code
 
