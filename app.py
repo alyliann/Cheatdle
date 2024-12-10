@@ -283,21 +283,16 @@ def optimal_guess(allowed_words, possible_words, priors):
     ents = get_entropies(allowed_words, possible_words, weights)
 
     top_ent = sorted(ents)[-10:]
-    # print('top_ent:', top_ent)
     top_i = sorted(np.argsort(ents)[-10:])[::-1]
-    # print('top_i:', top_i)
     top_guesses = []
     for num in top_i:
         top_guesses.append(allowed_words[num])
-    # print('top_guesses:', top_guesses)
 
-    # print('Suggestions: ', end='')
     st.session_state["suggestions"] = {}
-    for i in range(10):
+    for i in range(min(10, len(top_guesses))):
         st.session_state["suggestions"][i] = {
             top_guesses[i]: top_ent[i]
         }
-        # print(top_guesses[i], end=', ')
 
     return (allowed_words[np.argmax(ents)])
 

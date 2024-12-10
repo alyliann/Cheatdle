@@ -277,7 +277,7 @@ def optimal_guess(allowed_words, possible_words, priors):
         top_guesses.append(allowed_words[num])
 
     st.session_state["suggestions"] = {}
-    for i in range(10):
+    for i in range(min(10, len(top_guesses))):
         st.session_state["suggestions"][i] = {
             top_guesses[i]: top_ent[i]
         }
@@ -657,6 +657,7 @@ with stats:
             st.session_state["guesses"][-1], st.session_state["possibilities"])
 
     if not st.session_state["game_over"]:
+        print(len(st.session_state["suggestions"]), st.session_state["suggestions"])
         if len(st.session_state["possibilities"]) < 3:
             stats = {
                 'Top picks': [],
