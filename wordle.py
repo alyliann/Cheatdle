@@ -467,7 +467,7 @@ def get_wordle_by_date():
 
 
 def rerun():
-    # replaces st.rerun(), which triggers a warning in callbacks
+    # alternative to st.rerun(), which triggers a warning in callbacks
     st.write("")  # reloads page
 
 def reset_game():
