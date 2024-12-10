@@ -455,7 +455,7 @@ def get_wordle_by_date():
                     next(iter(st.session_state["all_wordles"])), '%Y-%m-%d').date()
                 if selected > latest:
                     st.error(
-                        f"We\'re so sorry! The last time this project was updated was {latest.strftime(' % B % -d, % Y')}. We randomized the answer instead.")
+                        f"We\'re so sorry! The last time this project was updated was {latest.strftime('%B %-d, %Y')}. We randomized the answer instead.")
                 else:
                     st.error(
                         f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
