@@ -481,36 +481,6 @@ def is_valid_hard_mode_guess(guess):
     return True, ""
 
 
-def initialize_game_state():
-    st.session_state["DICT_GUESSING"] = load_dict('data/wordle-answers.txt')
-    st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
-    st.session_state["guesses"] = []
-    st.session_state["answer"] = random.choice(st.session_state["DICT_ANSWERS"])
-    st.session_state["answer_date"] = None
-    st.session_state["all_wordles"] = None
-    st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    st.session_state["found"] = ''
-    st.session_state["game_over"] = False
-    st.session_state["game_won"] = False
-    st.session_state["hard_mode"] = False
-    st.session_state["table"] = initialize_table()
-    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
-    st.session_state["colors"] = {
-        'GRAY': '#464650',
-        'GREEN': '#06d6a0',
-        'YELLOW': '#ffd166'
-    }
-    st.session_state["priors"] = get_frequency_based_priors()
-    st.session_state["next_guess_map"] = {}
-    st.session_state["patterns"] = []
-    st.session_state["possibilities"] = list(
-        filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
-    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, 
-        "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, 
-        "4": {"raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, 
-        "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, 
-        "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
-
 def input_guess():
     guess = st.session_state.guess.upper()
     
@@ -545,7 +515,35 @@ def input_guess():
     st.session_state.guess = ''
 
 if "guesses" not in st.session_state:
-    initialize_game_state()
+    # Initialize game state only once
+    st.session_state["DICT_GUESSING"] = load_dict('data/wordle-answers.txt')
+    st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
+    st.session_state["guesses"] = []
+    st.session_state["answer"] = random.choice(st.session_state["DICT_ANSWERS"])
+    st.session_state["answer_date"] = None
+    st.session_state["all_wordles"] = None
+    st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    st.session_state["found"] = ''
+    st.session_state["game_over"] = False
+    st.session_state["game_won"] = False
+    st.session_state["hard_mode"] = False
+    st.session_state["table"] = initialize_table()
+    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
+    st.session_state["colors"] = {
+        'GRAY': '#464650',
+        'GREEN': '#06d6a0',
+        'YELLOW': '#ffd166'
+    }
+    st.session_state["priors"] = get_frequency_based_priors()
+    st.session_state["next_guess_map"] = {}
+    st.session_state["patterns"] = []
+    st.session_state["possibilities"] = list(
+        filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
+    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, 
+        "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, 
+        "4": {"raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, 
+        "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, 
+        "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
 
 
 def reset_game():
