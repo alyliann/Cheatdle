@@ -311,10 +311,12 @@ def get_next_guess(guesses, patterns, possibilities):
     )
     if phash not in st.session_state["next_guess_map"]:
         choices = st.session_state["DICT_ANSWERS"]
+        if st.session_state["hard_mode"]:
+            for guess, pattern in zip(guesses, patterns):
+                choices = get_possible_words(guess, pattern, choices)
         st.session_state["next_guess_map"][phash] = optimal_guess(
-            choices, possibilities, st.session_state["priors"]
+        choices, possibilities, st.session_state["priors"]
         )
-    return st.session_state["next_guess_map"][phash]
 
 
 def analyze_guesses(guess, possibilities):
