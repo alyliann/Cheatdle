@@ -55,7 +55,6 @@ def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 
-@st.cache_data
 def get_word_list(short=False):
     result = []
     file = SHORT_WORD_LIST_FILE if short else LONG_WORD_LIST_FILE
@@ -63,7 +62,7 @@ def get_word_list(short=False):
         result.extend([word.strip().upper() for word in fp.readlines()])
     return result
 
-@st.cache_data
+
 def get_word_frequencies(regenerate=False):
     if os.path.exists('data/freq_map.json') or regenerate:
         with open('data/freq_map.json') as fp:
@@ -84,7 +83,7 @@ def get_word_frequencies(regenerate=False):
         json.dump(freq_map, fp)
     return freq_map
 
-@st.cache_data
+
 def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
     freq_map = get_word_frequencies()
     words = np.array(list(freq_map.keys()))
@@ -103,7 +102,7 @@ def get_frequency_based_priors(n_common=3000, width_under_sigmoid=10):
         priors[word] = sigmoid(x)
     return priors
 
-@st.cache_data
+
 def get_true_wordle_prior():
     words = get_word_list()
     short_words = get_word_list(short=True)
@@ -213,7 +212,7 @@ def generate_pattern_matrix_in_blocks(many_words1, many_words2, block_length=CHU
 
     return block_matrix
 
-@st.cache_data
+
 def generate_full_pattern_matrix():
     words = get_word_list()
     pattern_matrix = generate_pattern_matrix_in_blocks(words, words)
@@ -348,7 +347,6 @@ def get_stats(data):
     return stats
 
 
-@st.cache_data
 def load_dict(file_name, upper=True):
     # Function to load dictionary
     if upper:
@@ -454,21 +452,45 @@ def initialize_table():
             guess[f'{c}'] = ''
     return table
 
+def is_valid_hard_mode_guess(guess):
+    """
+    Validates if a guess follows hard mode rules:
+    - Must include all previously found letters
+    - Must not include any previously ruled out letters
+    """
+    # Check if the guess contains all found letters
+    for letter in st.session_state["found"]:
+        if letter not in guess:
+            return False, f"Hard mode: Must use found letter '{letter}'"
+            
+    # Check if the guess contains any ruled out letters
+    # Only check letters that have been ruled out by previous guesses
+    if len(st.session_state["guesses"]) > 0:  # Only check after first guess
+        for letter in guess:
+            # A letter is ruled out if:
+            # 1. It's not in any previously found letters AND
+            # 2. It was used in a previous guess (so it's not in unguessed anymore) AND
+            # 3. It's not in the answer
+            if (letter not in st.session_state["found"] and  # not found
+                letter not in st.session_state["unguessed"] and  # was used before
+                letter not in st.session_state["answer"]):  # not in answer
+                return False, f"Hard mode: Cannot use ruled out letter '{letter}'"
+            
+    return True, ""
 
-if "guesses" not in st.session_state:
-    # Streamlit state initialization
+
+def initialize_game_state():
     st.session_state["DICT_GUESSING"] = load_dict('data/wordle-answers.txt')
     st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
     st.session_state["guesses"] = []
-    st.session_state["answer"] = random.choice(
-        st.session_state["DICT_ANSWERS"])
+    st.session_state["answer"] = random.choice(st.session_state["DICT_ANSWERS"])
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     st.session_state["found"] = ''
     st.session_state["game_over"] = False
     st.session_state["game_won"] = False
+    st.session_state["hard_mode"] = False
     st.session_state["table"] = initialize_table()
-    st.session_state["df"] = pd.DataFrame.from_dict(
-        st.session_state["table"], orient='index')
+    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
     st.session_state["colors"] = {
         'GRAY': '#464650',
         'GREEN': '#06d6a0',
@@ -479,43 +501,49 @@ if "guesses" not in st.session_state:
     st.session_state["patterns"] = []
     st.session_state["possibilities"] = list(
         filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
-    # Default guess suggestions:
-    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
-        "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
-
+    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, 
+        "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, 
+        "4": {"raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, 
+        "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, 
+        "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
 
 def input_guess():
     guess = st.session_state.guess.upper()
-    st.session_state["guesses"].append(guess)
-    if len(guess) == 5:
-        if guess in st.session_state["DICT_GUESSING"]:
-            n = len(st.session_state["guesses"])
-            st.session_state["unguessed"] = update_unguessed(
-                guess)
-            st.session_state["found"] = update_found(guess)
-            for i in range(5):
-                st.session_state["table"][f'Guess {n}'][f'{i}'] = guess[i]
-            st.session_state["df"] = pd.DataFrame.from_dict(
-                st.session_state["table"], orient='index')
-            st.session_state["game_over"] = (
-                guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
-            st.session_state["game_won"] = guess == st.session_state["answer"]
-        else:
-            st.error("Please enter a valid guess.")
-    else:
+    
+    if len(guess) != 5:
         st.error("Please enter a 5-letter word.")
+        st.session_state.guess = ''
+        return
+        
+    if guess not in st.session_state["DICT_GUESSING"]:
+        st.error("Please enter a valid guess.")
+        st.session_state.guess = ''
+        return
+        
+    if st.session_state["hard_mode"]:
+        is_valid, error_msg = is_valid_hard_mode_guess(guess)
+        if not is_valid:
+            st.error(error_msg)
+            st.session_state.guess = ''
+            return
+    
+    st.session_state["guesses"].append(guess)
+    n = len(st.session_state["guesses"])
+    st.session_state["unguessed"] = update_unguessed(guess)
+    st.session_state["found"] = update_found(guess)
+    
+    for i in range(5):
+        st.session_state["table"][f'Guess {n}'][f'{i}'] = guess[i]
+    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
+    
+    st.session_state["game_over"] = (guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
+    st.session_state["game_won"] = guess == st.session_state["answer"]
     st.session_state.guess = ''
 
+if "guesses" not in st.session_state:
+    initialize_game_state()
 
-if st.session_state["game_over"]:
-    if st.session_state["game_won"]:
-        st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
-    else:
-        st.error(
-            f"Game Over! The correct word was {st.session_state['answer']}")
-
-# Begin streamlit code:
-
+# Begin streamlit UI code
 wordle, sentiment, forest = st.tabs(["Wordle", "Sentiment", "Forest"])
 
 with wordle:
@@ -523,23 +551,24 @@ with wordle:
 
     with clone:
         st.subheader("Wordle")
+        
+        # Add hard mode toggle
+        st.checkbox("Hard Mode", key="hard_mode", 
+                   help="In hard mode, you must use all discovered letters and cannot use ruled out letters")
 
-        st.markdown(
-            f'**Found**: {st.session_state["found"]}', unsafe_allow_html=True)
-        st.markdown(
-            f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
+        st.markdown(f'**Found**: {st.session_state["found"]}', unsafe_allow_html=True)
+        st.markdown(f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
 
         st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
                                  .map(color_char2, subset='1')
                                  .map(color_char3, subset='2')
                                  .map(color_char4, subset='3')
                                  .map(color_char5, subset='4'), 
-             hide_index=True)
+                    hide_index=True)
 
         [input, restart] = st.columns([0.7, 0.4])
 
         with input:
-            # Input field for guesses
             if not st.session_state["game_over"]:
                 st.text_input("Enter your guess:", max_chars=5,
                             key='guess', on_change=input_guess).upper()
@@ -561,25 +590,14 @@ with wordle:
                 </style>""", unsafe_allow_html=True)
 
             if st.button("Restart Game"):
-                st.session_state["guesses"] = []
-                st.session_state["table"] = initialize_table()
-                st.session_state["df"] = pd.DataFrame.from_dict(
-                    st.session_state["table"], orient='index')
-                st.session_state["answer"] = random.choice(
-                    st.session_state["DICT_ANSWERS"])
-                st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                st.session_state["found"] = ''
-                st.session_state["game_over"] = False
-                st.session_state["game_won"] = False
-                st.session_state["priors"] = get_frequency_based_priors()
-                st.session_state["next_guess_map"] = {}
-                st.session_state["patterns"] = []
-                st.session_state["possibilities"] = list(
-                    filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
-                # Default guess suggestions:
-                st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
-                    "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
+                initialize_game_state()
                 st.rerun()
+
+        if st.session_state["game_over"]:
+            if st.session_state["game_won"]:
+                st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
+            else:
+                st.error(f"Game Over! The correct word was {st.session_state['answer']}")
 
     with stats:
         st.subheader('Guess Suggestions')
