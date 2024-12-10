@@ -455,7 +455,7 @@ def get_wordle_by_date():
                     next(iter(st.session_state["all_wordles"])), '%Y-%m-%d').date()
                 if selected > latest:
                     st.error(
-                        f'We\'re so sorry! The last time this project was updated was {latest.strftime(' % B % -d, % Y')}. We randomized the answer instead.')
+                        f"We\'re so sorry! The last time this project was updated was {latest.strftime('%B %-d, %Y')}. We randomized the answer instead.")
                 else:
                     st.error(
                         f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
@@ -467,9 +467,8 @@ def get_wordle_by_date():
 
 
 def rerun():
-    # replaces st.rerun(), which triggers a warning in callbacks
+    # alternative to st.rerun(), which triggers a warning in callbacks
     st.write("")  # reloads page
-
 
 def reset_game():
     st.session_state["guesses"] = []
@@ -521,7 +520,7 @@ def update_answer():
 
 if st.session_state["game_over"]:
     if st.session_state["game_won"]:
-        st.success(f"Congratulations! Score: {len(st.session_state["guesses"])}/6")
+        st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
     else:
         st.error(
             f"Game Over! The correct word was {st.session_state['answer']}")
