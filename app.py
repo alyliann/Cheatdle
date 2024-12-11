@@ -717,7 +717,7 @@ with sentiment:
             word_entry = words_freq[words_freq["word"].str.lower() == word]
 
             if word_entry.empty:
-                st.error(f"The word '{word}' was not found in the dataset.")
+                st.error(f"The word '{word.upper()}' was not found in the dataset.")
             else:
                 # Get Wordle day and filter tweets
                 wordle_day = int(word_entry.iloc[0]["day"])
@@ -764,7 +764,7 @@ with sentiment:
                         avg_sentiment = sum(polarity_scores) / len(polarity_scores)
                         sentiment_label = "😊 Positive" if avg_sentiment > 0 else "😐 Neutral" if avg_sentiment == 0 else "😟 Negative"
 
-                        st.subheader(f"Results for '{word}' (Wordle #{wordle_day}):")
+                        st.subheader(f"Results for '{word.upper()}':")
                         st.markdown(f"**Total Tweets Analyzed:** {total}")
                         st.markdown(f"**Average Sentiment:** {sentiment_label} ({avg_sentiment:.3f})")
 
@@ -877,7 +877,7 @@ with forest:
             average = None
             if word in averages["word"].values:
                 average = averages[averages["word"] == word]["score"].item()
-            st.subheader(f"Results for '{word}':")
+            st.subheader(f"Results for '{word.upper()}':")
             col1, col2= st.columns(2)
             with col1:
                 st.subheader("🌳")
