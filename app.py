@@ -1,27 +1,27 @@
 import os
 import json
-import math
 import time
+import math
+import pickle
 import pygame
 import random
 import numpy as np
 import pandas as pd
-from PIL import Image
-import streamlit as st
-import datetime as dt
-from datetime import datetime
-import itertools as it
-from textblob import TextBlob
-from scipy.stats import entropy
-import pickle
 import altair as alt
+from PIL import Image
+import datetime as dt
+import itertools as it
+import streamlit as st
 import plotly.express as px
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # Updated import
-from langchain.chains import RetrievalQA
-from langchain_openai import ChatOpenAI
+from datetime import datetime
+from textblob import TextBlob
 from dotenv import load_dotenv
+from scipy.stats import entropy
+from langchain_openai import ChatOpenAI
+from langchain.chains import RetrievalQA
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # Updated import
 
 st.set_page_config(
     page_title="Cheatdle",
