@@ -990,7 +990,8 @@ with rag:
             "OpenAI API key not found! Please set OPENAI_API_KEY in your .env file")
         st.write("1. Create a .env file in your project directory")
         st.write(
-            "2. Add your OpenAI API key like this: OPENAI_API_KEY=sk-your_api_key_here")
+            "2. Add your OpenAI API key like this:")
+        st.code("OPENAI_API_KEY=sk-your_api_key_here")
         st.write(
             "3. Make sure the .env file is in the same directory as your Python script")
         st.stop()
