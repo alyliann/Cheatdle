@@ -670,7 +670,7 @@ with stats:
         df = pd.DataFrame(stats)
         st.dataframe(df, width=200, hide_index=True)
 
-if not st.session_state["game_over"]:
+if not st.session_state["game_over"] and len(st.session_state["possibilities"]) >= 3:
     st.divider()
     st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
     if st.checkbox(label="Show Possible Answers"):

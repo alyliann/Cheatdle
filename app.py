@@ -598,14 +598,6 @@ with wordle:
         st.session_state.guess = ''
 
 
-    if st.session_state["game_over"]:
-        if st.session_state["game_won"]:
-            st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
-        else:
-            st.error(
-                f"Game Over! The correct word was {st.session_state['answer']}")
-
-
     # Streamlit top buttons code:
 
     [date, empty, mode] = st.columns([0.4, 0.1, 0.5])
@@ -661,6 +653,14 @@ with wordle:
                 reset_game()
                 st.rerun()
 
+        if st.session_state["game_over"]:
+            if st.session_state["game_won"]:
+                st.success(
+                    f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
+            else:
+                st.error(
+                    f"Game Over! The correct word was {st.session_state['answer']}")
+
     with stats:
         st.subheader('Guess Suggestions')
 
@@ -682,7 +682,7 @@ with wordle:
             df = pd.DataFrame(stats)
             st.dataframe(df, width=200, hide_index=True)
 
-    if not st.session_state["game_over"]:
+    if not st.session_state["game_over"] and len(st.session_state["possibilities"]) >= 3:
         st.divider()
         st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
         if st.checkbox(label="Show Possible Answers"):
