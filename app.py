@@ -289,7 +289,7 @@ def optimal_guess(allowed_words, possible_words, priors):
         top_guesses.append(allowed_words[num])
 
     st.session_state["suggestions"] = {}
-    for i in range(10):
+    for i in range(min(10, len(top_guesses))):
         st.session_state["suggestions"][i] = {
             top_guesses[i]: top_ent[i]
         }
