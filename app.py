@@ -1,14 +1,17 @@
+
 import os
-import math
 import json
+import math
+import pygame
 import random
 import numpy as np
 import pandas as pd
-import datetime as dt
+from PIL import Image
 import streamlit as st
+import datetime as dt
+from datetime import datetime
 import itertools as it
 from textblob import TextBlob
-from datetime import datetime
 from scipy.stats import entropy
 import pickle
 import altair as alt
@@ -19,11 +22,6 @@ from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # 
 from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-import gc
-import torch
-import logging
-
-# Existing imports, plus new RAG-specific imports
 
 st.set_page_config(
     page_title="Cheatdle",
@@ -32,7 +30,9 @@ st.set_page_config(
 
 st.logo('captures/cheatdle.png')
 
-# Begin 3Blue1Brown-sampled code:
+wordle, sentiment, forest, rag = st.tabs(["Game", "Sentiment", "Forest", "RAG"])
+
+# Begin 3Blue1Brown-sampled code below:
 
 MISPLACED = np.uint8(1)
 EXACT = np.uint8(2)
@@ -289,7 +289,7 @@ def optimal_guess(allowed_words, possible_words, priors):
         top_guesses.append(allowed_words[num])
 
     st.session_state["suggestions"] = {}
-    for i in range(min(10, len(top_guesses))):
+    for i in range(10):
         st.session_state["suggestions"][i] = {
             top_guesses[i]: top_ent[i]
         }
@@ -306,32 +306,23 @@ def get_next_guess(guesses, patterns, possibilities):
     )
     if phash not in st.session_state["next_guess_map"]:
         choices = st.session_state["DICT_ANSWERS"]
-        if st.session_state["hard_mode"]:
-            for guess, pattern in zip(guesses, patterns):
-                choices = get_possible_words(guess, pattern, choices)
         st.session_state["next_guess_map"][phash] = optimal_guess(
-        choices, possibilities, st.session_state["priors"]
+            choices, possibilities, st.session_state["priors"]
         )
 
 
 def analyze_guesses(guess, possibilities):
-    # print("\nGuess:", guess)
     pattern = get_pattern(guess, st.session_state["answer"])
-    # guesses.append(guess)
     st.session_state["patterns"].append(pattern)
 
     possibilities = get_possible_words(guess, pattern, possibilities)
-    # print("Possibilities:", possibilities[:12])
-    # print("Possibilities count:", len(possibilities))
 
-    next_guess = get_next_guess(
-        st.session_state["guesses"], st.session_state["patterns"], possibilities)
-    # print('\nNext best Guess:', next_guess)
+    get_next_guess(st.session_state["guesses"],
+                   st.session_state["patterns"], possibilities)
     return possibilities
 
 
-# Begin game code:
-
+# Begin Pygame code below:
 
 def get_stats(data):
     # Turns wordle code suggestions and entropies into organized dict
@@ -358,202 +349,37 @@ def load_dict(file_name, upper=True):
             return [word for word in words]
 
 
-def color_char1(cell):
-    # CSS styling for Pandas dataframe column 1
-    answer = st.session_state["answer"]
-    colors = st.session_state["colors"]
-    if cell == '':
-        return ""
-    elif answer[0] == cell:
-        return f"background-color: {colors['GREEN']}; color: white;"
-    elif cell in answer:
-        return f"background-color: {colors['YELLOW']}; color: white;"
-    else:
-        return f"background-color: {colors['GRAY']}; color: white;"
+# Initialize necessary variables for Wordle clone
 
+WIDTH = 600
+HEIGHT = 700
+MARGIN = 10
+T_MARGIN = 100
+B_MARGIN = 100
+LR_MARGIN = 100
 
-def color_char2(cell):
-    # CSS styling for Pandas dataframe column 2
-    answer = st.session_state["answer"]
-    colors = st.session_state["colors"]
-    if cell == '':
-        return ""
-    elif answer[1] == cell:
-        return f"background-color: {colors['GREEN']}; color: white;"
-    elif cell in answer:
-        return f"background-color: {colors['YELLOW']}; color: white;"
-    else:
-        return f"background-color: {colors['GRAY']}; color: white;"
+GREY = (70, 70, 80)
+GREEN = (6, 214, 160)
+YELLOW = (255, 209, 102)
 
-
-def color_char3(cell):
-    # CSS styling for Pandas dataframe column 3
-    answer = st.session_state["answer"]
-    colors = st.session_state["colors"]
-    if cell == '':
-        return ""
-    elif answer[2] == cell:
-        return f"background-color: {colors['GREEN']}; color: white;"
-    elif cell in answer:
-        return f"background-color: {colors['YELLOW']}; color: white;"
-    else:
-        return f"background-color: {colors['GRAY']}; color: white;"
-
-
-def color_char4(cell):
-    # CSS styling for Pandas dataframe column 4
-    answer = st.session_state["answer"]
-    colors = st.session_state["colors"]
-    if cell == '':
-        return ""
-    elif answer[3] == cell:
-        return f"background-color: {colors['GREEN']}; color: white;"
-    elif cell in answer:
-        return f"background-color: {colors['YELLOW']}; color: white;"
-    else:
-        return f"background-color: {colors['GRAY']}; color: white;"
-
-
-def color_char5(cell):
-    # CSS styling for Pandas dataframe column 5
-    answer = st.session_state["answer"]
-    colors = st.session_state["colors"]
-    if cell == '':
-        return ""
-    elif answer[4] == cell:
-        return f"background-color: {colors['GREEN']}; color: white; font-size: 13px;"
-    elif cell in answer:
-        return f"background-color: {colors['YELLOW']}; color: white; font-size: 13px;"
-    else:
-        return f"background-color: {colors['GRAY']}; color: white; font-size: 13px;"
-
-
-def update_unguessed(guess):
-    # Updates string of all unguessed letters
-    return "".join([letter for letter in st.session_state["unguessed"] if letter not in guess])
-
-
-def update_found(guess):
-    # Updates string of all found letters
-    found = st.session_state["found"]
-    for c in guess:
-        if c not in found and c in st.session_state["answer"]:
-            found += c
-    return "".join(sorted(found))
-
-
-def initialize_table():
-    table = dict()
-    for r in range(6):
-        table[f'Guess {r+1}'] = dict()
-        guess = table[f'Guess {r+1}']
-        for c in range(5):
-            guess[f'{c}'] = ''
-    return table
-
-def is_valid_hard_mode_guess(guess):
-    """
-    Validates if a guess follows hard mode rules:
-    - Must include all previously found letters
-    - Must not include any previously ruled out letters
-    """
-    # Check if the guess contains all found letters
-    for letter in st.session_state["found"]:
-        if letter not in guess:
-            return False, f"Hard mode: Must use found letter '{letter}'"
-            
-    # Check if the guess contains any ruled out letters
-    # Only check letters that have been ruled out by previous guesses
-    if len(st.session_state["guesses"]) > 0:  # Only check after first guess
-        for letter in guess:
-            # A letter is ruled out if:
-            # 1. It's not in any previously found letters AND
-            # 2. It was used in a previous guess (so it's not in unguessed anymore) AND
-            # 3. It's not in the answer
-            if (letter not in st.session_state["found"] and  # not found
-                letter not in st.session_state["unguessed"] and  # was used before
-                letter not in st.session_state["answer"]):  # not in answer
-                return False, f"Hard mode: Cannot use ruled out letter '{letter}'"
-            
-    return True, ""
-
-
-def input_guess():
-    guess = st.session_state.guess.upper()
-    
-    if len(guess) != 5:
-        st.error("Please enter a 5-letter word.")
-        st.session_state.guess = ''
-        return
-        
-    if guess not in st.session_state["DICT_GUESSING"]:
-        st.error("Please enter a valid guess.")
-        st.session_state.guess = ''
-        return
-        
-    if st.session_state["hard_mode"]:
-        is_valid, error_msg = is_valid_hard_mode_guess(guess)
-        if not is_valid:
-            st.error(error_msg)
-            st.session_state.guess = ''
-            return
-    
-    st.session_state["guesses"].append(guess)
-    n = len(st.session_state["guesses"])
-    st.session_state["unguessed"] = update_unguessed(guess)
-    st.session_state["found"] = update_found(guess)
-    
-    for i in range(5):
-        st.session_state["table"][f'Guess {n}'][f'{i}'] = guess[i]
-    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
-    
-    st.session_state["game_over"] = (guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
-    st.session_state["game_won"] = guess == st.session_state["answer"]
-    st.session_state.guess = ''
+pygame.init()
+pygame.font.init()
+SQ_SIZE = (WIDTH - 4 * MARGIN - 2 * LR_MARGIN) // 5
+FONT = pygame.font.SysFont("free sans bold", SQ_SIZE)
+FONT_SMALL = pygame.font.SysFont("free sans bold", SQ_SIZE // 2)
 
 if "guesses" not in st.session_state:
-    # Initialize game state only once
+    # Streamlit state initialization
     st.session_state["DICT_GUESSING"] = load_dict('data/wordle-answers.txt')
     st.session_state["DICT_ANSWERS"] = load_dict('data/wordle-answers.txt')
     st.session_state["guesses"] = []
-    st.session_state["answer"] = random.choice(st.session_state["DICT_ANSWERS"])
+    st.session_state["input"] = ""
+    st.session_state["answer"] = random.choice(
+        st.session_state["DICT_ANSWERS"])
     st.session_state["answer_date"] = None
     st.session_state["all_wordles"] = None
     st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    st.session_state["found"] = ''
     st.session_state["game_over"] = False
-    st.session_state["game_won"] = False
-    st.session_state["hard_mode"] = False
-    st.session_state["table"] = initialize_table()
-    st.session_state["df"] = pd.DataFrame.from_dict(st.session_state["table"], orient='index')
-    st.session_state["colors"] = {
-        'GRAY': '#464650',
-        'GREEN': '#06d6a0',
-        'YELLOW': '#ffd166'
-    }
-    st.session_state["priors"] = get_frequency_based_priors()
-    st.session_state["next_guess_map"] = {}
-    st.session_state["patterns"] = []
-    st.session_state["possibilities"] = list(
-        filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
-    st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, 
-        "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, 
-        "4": {"raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, 
-        "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, 
-        "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
-
-
-def reset_game():
-    st.session_state["guesses"] = []
-    st.session_state["answer"] = random.choice(
-        st.session_state["DICT_ANSWERS"]) if not st.session_state["answer_date"] else get_wordle_by_date()
-    st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    st.session_state["found"] = ''
-    st.session_state["game_over"] = False
-    st.session_state["game_won"] = False
-    st.session_state["table"] = initialize_table()
-    st.session_state["df"] = pd.DataFrame.from_dict(
-        st.session_state["table"], orient='index')
     st.session_state["priors"] = get_frequency_based_priors()
     st.session_state["next_guess_map"] = {}
     st.session_state["patterns"] = []
@@ -564,101 +390,184 @@ def reset_game():
         "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
 
 
-def get_wordle_by_date():
-    if st.session_state["answer_date"]:
-        if not st.session_state["all_wordles"]:
-            # initialize all_wordles dict to refer back to throughout session
-            if os.path.exists('data/all_wordles.json'):
-                with open('data/all_wordles.json') as fp:
-                    # load json of all past wordles and their date of occurence
-                    st.session_state["all_wordles"] = json.load(fp)
-                    return get_wordle_by_date()
-            else:
-                st.error(
-                    f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
-        else:
-            if st.session_state["answer_date"] in st.session_state["all_wordles"]:
-                return st.session_state["all_wordles"][st.session_state["answer_date"]]
-            else:
-                # if date not found in dict
-                selected = datetime.strptime(
-                    st.session_state["answer_date"], '%Y-%m-%d').date()
-                latest = datetime.strptime(
-                    next(iter(st.session_state["all_wordles"])), '%Y-%m-%d').date()
-                if selected > latest:
-                    st.error(
-                        f"We\'re so sorry! The last time this project was updated was {latest.strftime('%B %-d, %Y')}. We randomized the answer instead.")
+def determine_unguessed_letters(guesses):
+    # Function to determine unguessed letters:
+    guessed_letters = "".join(guesses)
+    return "".join([letter for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if letter not in guessed_letters])
+
+
+def determine_color(guess, j):
+    # Function to determine color of letters:
+    letter = guess[j]
+    if letter == st.session_state["answer"][j]:
+        return GREEN
+    elif letter in st.session_state["answer"]:
+        return YELLOW
+    else:
+        return GREY
+
+
+def draw_guesses(surface):
+    # Function to draw guesses:
+    y = T_MARGIN
+    for i in range(6):
+        x = LR_MARGIN
+        for j in range(5):
+            square = pygame.Rect(x, y, SQ_SIZE, SQ_SIZE)
+            pygame.draw.rect(surface, GREY, square, width=2, border_radius=3)
+
+            if i < len(st.session_state["guesses"]):
+                color = determine_color(st.session_state["guesses"][i], j)
+                pygame.draw.rect(surface, color, square, border_radius=3)
+                letter = FONT.render(
+                    st.session_state["guesses"][i][j], False, (255, 255, 255))
+                surface.blit(letter, letter.get_rect(
+                    center=(x + SQ_SIZE // 2, y + SQ_SIZE // 2)))
+
+            if i == len(st.session_state["guesses"]) and j < len(st.session_state["input"]):
+                letter = FONT.render(st.session_state["input"][j], False, GREY)
+                surface.blit(letter, letter.get_rect(
+                    center=(x + SQ_SIZE // 2, y + SQ_SIZE // 2)))
+
+            x += SQ_SIZE + MARGIN
+        y += SQ_SIZE + MARGIN
+
+
+# Begin Streamlit code:
+
+with wordle:
+
+    def render_frame():
+        surface = pygame.Surface((WIDTH, HEIGHT))
+        surface.fill("white")
+        letters = FONT_SMALL.render(st.session_state["unguessed"], False, GREY)
+        surface.blit(letters, letters.get_rect(center=(WIDTH // 2, T_MARGIN // 2)))
+        draw_guesses(surface)
+        return pygame.surfarray.array3d(surface).swapaxes(0, 1)
+
+
+    def get_wordle_by_date():
+        if st.session_state["answer_date"]:
+            if not st.session_state["all_wordles"]:
+                # initialize all_wordles dict to refer back to throughout session
+                if os.path.exists('data/all_wordles.json'):
+                    with open('data/all_wordles.json') as fp:
+                        # load json of all past wordles and their date of occurence
+                        st.session_state["all_wordles"] = json.load(fp)
+                        return get_wordle_by_date()
                 else:
                     st.error(
                         f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
-    if st.session_state["answer_date"]:
-        # if date not found in all_wordles dict
-        st.session_state["answer_date"] = None
-    # if date not provided or error encountered preventing date-wordle matching:
-    return random.choice(st.session_state["DICT_ANSWERS"])
+            else:
+                if st.session_state["answer_date"] in st.session_state["all_wordles"]:
+                    return st.session_state["all_wordles"][st.session_state["answer_date"]]
+                else:
+                    # if date not found in dict
+                    selected = datetime.strptime(
+                        st.session_state["answer_date"], '%Y-%m-%d').date()
+                    latest = datetime.strptime(
+                        next(iter(st.session_state["all_wordles"])), '%Y-%m-%d').date()
+                    if selected > latest:
+                        st.error(
+                            f"We\'re so sorry! The last time this project was updated was {latest.strftime(' % B % -d, % Y')}. We randomized the answer instead.")
+                    else:
+                        st.error(
+                            f'Could not retrieve Wordle for {st.session_state["answer_date"]}, randomized answer instead.')
+        if st.session_state["answer_date"]:
+            # if date not found in all_wordles dict
+            st.session_state["answer_date"] = None
+        # if date not provided or error encountered preventing date-wordle matching:
+        return random.choice(st.session_state["DICT_ANSWERS"])
 
 
-def update_answer():
-    if st.session_state.date:
-        st.session_state["answer_date"] = st.session_state.date.strftime(
-            '%Y-%m-%d')  # Format as 'YYYY-mm-dd' string
-    else:
-        st.session_state["answer_date"] = None
-    st.session_state["answer"] = get_wordle_by_date()
-    reset_game()
+    def rerun():
+        # replaces st.rerun(), which triggers a warning in callbacks
+        st.write("")  # reloads page
 
-def update_mode():
-    if st.session_state.hard:
-        st.session_state["hard_mode"] = True
-    else:
-        st.session_state["hard_mode"] = False
-    reset_game()
+    def reset_game():
+        st.session_state["guesses"] = []
+        st.session_state["input"] = ""
+        st.session_state["answer"] = random.choice(
+            st.session_state["DICT_ANSWERS"]) if not st.session_state["answer_date"] else get_wordle_by_date()
+        st.session_state["unguessed"] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        st.session_state["game_over"] = False
+        st.session_state["game_won"] = False
+        st.session_state["priors"] = get_frequency_based_priors()
+        st.session_state["next_guess_map"] = {}
+        st.session_state["patterns"] = []
+        st.session_state["possibilities"] = list(
+            filter(lambda w: st.session_state["priors"][w] > 0, st.session_state["DICT_ANSWERS"]))
+        # Default guess suggestions:
+        st.session_state["suggestions"] = {"0": {"trace": 5.8003640125599665}, "1": {"stare": 5.820775159036701}, "2": {"snare": 5.823403587185409}, "3": {"slate": 5.872115140997043}, "4": {
+            "raise": 5.877133130432676}, "5": {"irate": 5.8857096269200975}, "6": {"crate": 5.895912778048746}, "7": {"crane": 5.896998055971093}, "8": {"arose": 5.9015186142727085}, "9": {"arise": 5.91076001137177}}
 
-# Begin streamlit UI code
-wordle, sentiment, forest = st.tabs(["Wordle", "Sentiment", "Forest"])
 
-with wordle:
+    def input_guess():
+        guess = st.session_state.guess.upper()
+        if len(guess) == 5:
+            if guess in st.session_state["DICT_GUESSING"]:
+                st.session_state["guesses"].append(guess)
+                st.session_state["unguessed"] = determine_unguessed_letters(
+                    st.session_state["guesses"])
+                st.session_state["game_over"] = (
+                    guess == st.session_state["answer"] or len(st.session_state["guesses"]) == 6)
+                st.session_state["game_won"] = guess == st.session_state["answer"]
+
+            else:
+                st.error("Please enter a valid guess.")
+        else:
+            st.error("Please enter a 5-letter word.")
+        st.session_state.guess = ""
+        rerun()
+
+
+    def update_answer():
+        if st.session_state.date:
+            st.session_state["answer_date"] = st.session_state.date.strftime(
+                '%Y-%m-%d')  # Format as 'YYYY-mm-dd' string
+        else:
+            st.session_state["answer_date"] = None
+        st.session_state["answer"] = get_wordle_by_date()
+        reset_game()
+        # st.write(st.session_state["answer_date"], st.session_state["answer"])  # for testing
+
 
     if st.session_state["game_over"]:
         if st.session_state["game_won"]:
             st.success(f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
         else:
-            st.error(f"Game Over! The correct word was {st.session_state['answer']}")
+            st.error(
+                f"Game Over! The correct word was {st.session_state['answer']}")
 
-    [date, empty, mode] = st.columns([0.4, 0.1, 0.5])
+
+    # Streamlit top buttons code:
+
+    [date, empty] = st.columns([0.4, 0.6])
 
     with date:
         st.date_input('Select Wordle (Random if unspecified)', value=None, min_value=dt.date(
             2021, 6, 19), max_value=dt.date.today(), format='MM/DD/YYYY', key='date', on_change=update_answer)
 
-    with mode:
-        st.write('')
-        st.write('')
-        st.checkbox("Hard Mode", key="hard",
-                    help="In hard mode, you must use all discovered letters and cannot use ruled out letters", on_change=update_mode)
+    # Remaining Streamlit code
 
-    [clone, empty, stats] = st.columns([0.5, 0.1, 0.4])
+    [wordle, empty, stats] = st.columns([0.5, 0.1, 0.4])
 
-    with clone:
+    with wordle:
         wordle_type = st.session_state["answer_date"] if st.session_state["answer_date"] else 'Random'
         st.subheader(f"{wordle_type} Wordle")
 
-        st.markdown(f'**Found**: {st.session_state["found"]}', unsafe_allow_html=True)
-        st.markdown(f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
-
-        st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
-                                 .map(color_char2, subset='1')
-                                 .map(color_char3, subset='2')
-                                 .map(color_char4, subset='3')
-                                 .map(color_char5, subset='4'), 
-                    hide_index=True)
+        frame = render_frame()
+        frame_image = Image.fromarray(frame)
+        with st.container(border=True, height=400):
+            st.image(frame_image)
 
         [input, restart] = st.columns([0.7, 0.4])
 
         with input:
+            # Input field for guesses
             if not st.session_state["game_over"]:
                 st.text_input("Enter your guess:", max_chars=5,
-                            key='guess', on_change=input_guess).upper()
+                              key='guess', on_change=input_guess).upper()
 
         with restart:
             m = st.markdown("""
@@ -706,7 +615,6 @@ with wordle:
         st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
         if st.checkbox(label="Show Possible Answers"):
             st.write(st.session_state["possibilities"])
-
 
 with sentiment:
     st.header("🚀 Sentiment Analysis")
@@ -813,7 +721,46 @@ with sentiment:
 
 with forest:
     st.header("🎯 Score Predictor")
+
     # Load datasets
+    @st.cache_data
+    def load_forest_data():
+        tweets = pd.read_csv("data/tweets.zip")
+        words = pd.read_csv("data/words_freq.csv")
+        tweets["score"] = tweets["tweet_text"].str[11]
+        tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
+        tweets.rename(columns={"wordle_id": "day"}, inplace=True)
+        words.dropna(inplace=True)
+        words["day"] = pd.to_numeric(words['day'], errors='coerce')
+        freqs = pd.read_csv("data/letter-frequencies.csv")
+        freqs = freqs[["Letter", "English"]]
+        freqs = freqs["English"].tolist()
+        df = pd.merge(words, tweets, on='day')
+        df.drop(columns=['tweet_id'], inplace=True)
+        averages = df.groupby("word", as_index=False)['score'].mean()
+        percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
+        labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
+        chart_data = pd.DataFrame(
+            {
+                "Tries": labels,
+                "Percentage": percents,
+            }
+        )
+        countries = pd.read_csv("data/countries.csv")
+        global_cities = pd.read_csv("data/top10_global_cities.csv")
+        us_cities = pd.read_csv("data/top10_us_cities.csv")
+        states = pd.read_csv("data/states.csv")
+        return freqs, df, averages, countries, chart_data, global_cities, us_cities, states
+    freqs, df, averages, countries, chart_data, global_cities, us_cities, states = load_forest_data()
+
+    # Load model
+    @st.cache_resource
+    def load_model():
+        filename = 'data/wordle_prediction.pkl'
+        model = pickle.load(open(filename, 'rb'))
+        return model
+    model = load_model()
+
     st.markdown(
     """
     Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
@@ -825,54 +772,16 @@ with forest:
         if not word.isalpha() or len(word) != 5:
             st.error("Please enter a valid 5-letter word.")
         else:
-            st.success(f"Making inference...")
-
-            @st.cache_data
-            def load_data():
-                words = pd.read_csv("data/words_freq.csv")
-                tweets = pd.read_csv("data/tweets.zip")
-                tweets["score"] = tweets["tweet_text"].str[11]
-                tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
-                tweets.rename(columns={"wordle_id": "day"}, inplace=True)
-                words.dropna(inplace=True)
-                words["day"] = pd.to_numeric(words['day'], errors='coerce')
-                freqs = pd.read_csv("data/letter-frequencies.csv")
-                freqs = freqs[["Letter", "English"]]
-                freqs = freqs["English"].tolist()
-                df = pd.merge(words, tweets, on='day')
-                df.drop(columns=['tweet_id'], inplace=True)
-                averages = df.groupby("word", as_index=False)['score'].mean()
-
-                percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
-                labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
-                chart_data = pd.DataFrame(
-                    {
-                        "Tries": labels,
-                        "Percentage": percents,
-                    }
-                )
-                countries = pd.read_csv("data/countries.csv")
-                global_cities = pd.read_csv("data/top10_global_cities.csv")
-                us_cities = pd.read_csv("data/top10_us_cities.csv")
-                states = pd.read_csv("data/states.csv")
-                return df, freqs, averages, chart_data, countries, global_cities, us_cities, states
-            df, freqs, averages, chart_data, countries, global_cities, us_cities, states = load_data()
-
-            @st.cache_resource
-            def load_model():
-                filename = 'data/wordle_prediction.pkl'
-                model = pickle.load(open(filename, 'rb'))
-                return model
-            model = load_model()
-
+            st.success(f"Running random forest...")
 
             # For any given word:
             #    1. Put the word in lower case
             #    2. Extract each letter in the word and make it it's own column
             #    3. Convert to ASCII number using ord() function
             #    4. subtract 97 to simplify char to number representation (a = 0, b = 1, c = 2, ...)
-            #    5. Use number representation as index in frequency array
+            #    5. get frequency of each character using number representation as index to frequency array 
 
+            @st.cache_data
             def predict_score(word):
                 if (not word.isalpha() or len(word) != 5):
                     raise Exception(
@@ -891,7 +800,6 @@ with forest:
                                 freqs[df["letter_5"][0]]
                 df.drop(columns=["word"], inplace=True)
                 return model.predict(df)
-            
             prediction = predict_score(word)
             # If word isn't found in tweet data, None is returned for the average score
             average = None
@@ -924,6 +832,7 @@ with forest:
             st.altair_chart(c, use_container_width=True) 
             st.subheader("🌎 Your word vs. the world")
 
+            @st.cache_data
             def get_bounds(scores, names, prediction):
                 if prediction > max(scores):
                     return None, float('inf')
@@ -994,3 +903,134 @@ with forest:
                 st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
             c = alt.Chart(us_cities).mark_bar().encode(x=alt.X('Score:Q', scale=alt.Scale(domain=(3.5, 3.67), clamp=True)), y=alt.Y('City:O').sort('x'))
             st.altair_chart(c.properties(height = 500), use_container_width=True) 
+
+with rag:
+    # Load environment variables
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    # Set environment variable to handle tokenizer warnings
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+    # Check for API key before proceeding
+    if not api_key:
+        st.error(
+            "OpenAI API key not found! Please set OPENAI_API_KEY in your .env file")
+        st.write("1. Create a .env file in your project directory")
+        st.write(
+            "2. Add your OpenAI API key like this: OPENAI_API_KEY=sk-your_api_key_here")
+        st.write(
+            "3. Make sure the .env file is in the same directory as your Python script")
+        st.stop()
+
+    @st.cache_resource
+    def initialize_qa_chain():
+        try:
+            # Get the absolute path to the PDF relative to the script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            pdfpath = os.path.join(
+                script_dir, "data/CTP Project Design Doc.pdf")
+
+            # Check if PDF exists
+            if not os.path.exists(pdfpath):
+                st.error(f"PDF file not found at: {pdfpath}")
+                st.stop()
+
+            st.write(f"Loading PDF from: {pdfpath}")
+
+            # Load PDF
+            loader = PyPDFLoader(pdfpath)
+            pages = loader.load()
+
+            # Create embeddings
+            embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L12-v2",
+                model_kwargs={'device': 'cpu'}
+            )
+
+            # Create vector store
+            vectorstore = FAISS.from_documents(pages, embeddings)
+
+            # Initialize ChatOpenAI with explicit API key
+            llm = ChatOpenAI(
+                temperature=0.7,
+                api_key=api_key,
+                model="gpt-3.5-turbo",
+                max_tokens=100,
+            )
+
+            # Create the QA chain
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                chain_type="stuff",
+                retriever=vectorstore.as_retriever(),
+            )
+
+            return qa_chain
+
+        except Exception as e:
+            st.error(f"Error in initialize_qa_chain: {str(e)}")
+            raise e
+
+    # Page title
+    st.title("Ask About Cheatdle")
+
+    # Initialize session state for messages
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Initialize QA chain
+    try:
+        with st.spinner("Loading PDF and initializing QA system..."):
+            qa_chain = initialize_qa_chain()
+        st.success("QA system initialized successfully!")
+    except Exception as e:
+        st.error(f"Error initializing QA chain: {str(e)}")
+        st.stop()
+
+    # Placeholder for chat messages
+    chat_placeholder = st.empty()
+
+    # Render chat history dynamically
+    with chat_placeholder.container():
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+    # Chat input with debouncing
+    if "last_prompt" not in st.session_state:
+        st.session_state.last_prompt = ""
+
+    prompt = st.chat_input("Ask a question about Cheatdle...")
+
+    if prompt and prompt != st.session_state.last_prompt:
+        st.session_state.last_prompt = prompt
+
+        # Display user message immediately
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # Refresh chat history
+        with chat_placeholder.container():
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+        # Process the input and get a response
+        try:
+            with st.spinner("Searching document for answer..."):
+                response = qa_chain.invoke(prompt)
+
+            result = response["result"]
+
+            # Display assistant response
+            st.session_state.messages.append(
+                {"role": "assistant", "content": result})
+
+            # Refresh chat history again
+            with chat_placeholder.container():
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.markdown(message["content"])
+
+        except Exception as e:
+            st.error(f"Error processing question: {str(e)}")
