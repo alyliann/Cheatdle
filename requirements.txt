@@ -5,6 +5,8 @@ textblob
 pygame
 altair
 plotly
+pypdf
+sentence-transformers
 scipy
 scikit-learn
 python-dotenv
