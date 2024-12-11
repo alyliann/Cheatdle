@@ -726,7 +726,7 @@ with sentiment:
                 if wordle_tweets.empty:
                     st.error(f"No tweets found for Wordle word {word.upper()}.")
                 else:
-                    st.success(f"Analyzing tweets for Wordle #{wordle_day}...")
+                    st.success(f"Analyzing tweets for Wordle word {word.upper()}...")
 
                     # Sentiment Analysis
                     sentiments = {"positive": 0, "neutral": 0, "negative": 0}
@@ -877,7 +877,7 @@ with forest:
             average = None
             if word in averages["word"].values:
                 average = averages[averages["word"] == word]["score"].item()
-            st.subheader(f"Results for '{word.upper()}':")
+            st.subheader(f"Results for {word.upper()}:")
             col1, col2= st.columns(2)
             with col1:
                 st.subheader("🌳")
