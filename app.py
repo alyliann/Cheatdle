@@ -724,7 +724,7 @@ with sentiment:
                 wordle_tweets = tweets[tweets["wordle_id"] == wordle_day]
 
                 if wordle_tweets.empty:
-                    st.error(f"No tweets found for Wordle #{wordle_day}.")
+                    st.error(f"No tweets found for Wordle word {word.upper()}.")
                 else:
                     st.success(f"Analyzing tweets for Wordle #{wordle_day}...")
 
