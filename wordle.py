@@ -657,7 +657,6 @@ with stats:
             st.session_state["guesses"][-1], st.session_state["possibilities"])
 
     if not st.session_state["game_over"]:
-        print(len(st.session_state["suggestions"]), st.session_state["suggestions"])
         if len(st.session_state["possibilities"]) < 3:
             stats = {
                 'Top picks': [],
