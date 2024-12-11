@@ -22,10 +22,10 @@
     <a href="https://github.com/ahmadbasyouni10/Cheatdle"><strong>Explore »</strong></a>
     <br />
     <br />
-    <a href="https://cheatdle.streamlit.app/">View Project Site</a>
+    <!-- <a href="https://cheatdle.streamlit.app/">View Project Site</a>
     ·
     <a href="https://cheatdle-rag.streamlit.app/">View Project RAG</a>
-    ·
+    · -->
     <a href="https://github.com/ahmadbasyouni10/Cheatdle/issues">Report Bug</a>
     ·
     <a href="https://github.com/ahmadbasyouni10/Cheatdle/pulls">Request Feature</a>
