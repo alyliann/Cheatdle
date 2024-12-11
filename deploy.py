@@ -976,9 +976,9 @@ with forest:
             scores = states["Score"].tolist()
             higher, lower = get_bounds(scores, names, prediction)
             if higher == None:
-                st.markdown("The predicted score of your word is **higher** than all of the scores of each of every U.S. state.  \n Your word might be tough for the average American!  \n")
+                st.markdown("The predicted score of your word is **higher** than all of the scores of each U.S. state.  \n Your word might be tough for the average American!  \n")
             elif lower == None:
-                st.markdown("The predicted score of your word is **lower** than all of the scores of each of every U.S. state.  \n Can the average American guess your word easily?  \n")
+                st.markdown("The predicted score of your word is **lower** than all of the scores of each U.S. state.  \n Can the average American guess your word easily?  \n")
             else:
                 st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
             fig = px.choropleth(states, locations="Abbreviation", locationmode="USA-states", color="Score", scope="usa", hover_name="State", color_continuous_scale="Viridis", range_color=(3, 4),)
