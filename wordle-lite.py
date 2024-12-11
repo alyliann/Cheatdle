@@ -614,385 +614,93 @@ def update_mode():
         st.session_state["hard_mode"] = False
     reset_game()
 
-# Begin streamlit UI code
-wordle, sentiment, forest = st.tabs(["Wordle", "Sentiment", "Forest"])
+[date, empty, mode] = st.columns([0.4, 0.1, 0.5])
 
-with wordle:
+with date:
+    st.date_input('Select Wordle (Random if unspecified)', value=None, min_value=dt.date(
+        2021, 6, 19), max_value=dt.date.today(), format='MM/DD/YYYY', key='date', on_change=update_answer)
 
-    [date, empty, mode] = st.columns([0.4, 0.1, 0.5])
+with mode:
+    st.write('')
+    st.write('')
+    st.checkbox("Hard Mode", key="hard",
+                help="In hard mode, you must use all discovered letters and cannot use ruled out letters", on_change=update_mode)
 
-    with date:
-        st.date_input('Select Wordle (Random if unspecified)', value=None, min_value=dt.date(
-            2021, 6, 19), max_value=dt.date.today(), format='MM/DD/YYYY', key='date', on_change=update_answer)
+[clone, empty, stats] = st.columns([0.5, 0.1, 0.4])
 
-    with mode:
-        st.write('')
-        st.write('')
-        st.checkbox("Hard Mode", key="hard",
-                    help="In hard mode, you must use all discovered letters and cannot use ruled out letters", on_change=update_mode)
+with clone:
+    wordle_type = st.session_state["answer_date"] if st.session_state["answer_date"] else 'Random'
+    st.subheader(f"{wordle_type} Wordle")
 
-    [clone, empty, stats] = st.columns([0.5, 0.1, 0.4])
+    st.markdown(f'**Found**: {st.session_state["found"]}', unsafe_allow_html=True)
+    st.markdown(f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
 
-    with clone:
-        wordle_type = st.session_state["answer_date"] if st.session_state["answer_date"] else 'Random'
-        st.subheader(f"{wordle_type} Wordle")
+    st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
+                             .map(color_char2, subset='1')
+                             .map(color_char3, subset='2')
+                             .map(color_char4, subset='3')
+                             .map(color_char5, subset='4'), 
+                hide_index=True)
 
-        st.markdown(f'**Found**: {st.session_state["found"]}', unsafe_allow_html=True)
-        st.markdown(f'**Unguessed**: {st.session_state["unguessed"]}', unsafe_allow_html=True)
+    [input, restart] = st.columns([0.7, 0.4])
 
-        st.dataframe(st.session_state["df"].style.map(color_char1, subset='0')
-                                 .map(color_char2, subset='1')
-                                 .map(color_char3, subset='2')
-                                 .map(color_char4, subset='3')
-                                 .map(color_char5, subset='4'), 
-                    hide_index=True)
-
-        [input, restart] = st.columns([0.7, 0.4])
-
-        with input:
-            if not st.session_state["game_over"]:
-                st.text_input("Enter your guess:", max_chars=5,
-                            key='guess', on_change=input_guess).upper()
-
-        with restart:
-            m = st.markdown("""
-                <style>
-                div.stButton > button:first-child {
-                    background-color: #eb4242;
-                    border-color: #eb4242;
-                    color: #ffffff;
-                    margin-top: 0.7rem;
-                }
-                div.stButton > button:hover {
-                    background-color: #c22121;
-                    border-color: #c22121;
-                    color: #ffffff;
-                    }
-                </style>""", unsafe_allow_html=True)
-
-            if st.button("Restart Game"):
-                reset_game()
-                st.rerun()
-
-        if st.session_state["game_over"]:
-            if st.session_state["game_won"]:
-                st.success(
-                    f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
-            else:
-                st.error(
-                    f"Game Over! The correct word was {st.session_state['answer']}")
-
-    with stats:
-        st.subheader('Guess Suggestions')
-
-        if len(st.session_state["guesses"]) > 0:
-            st.session_state["possibilities"] = analyze_guesses(
-                st.session_state["guesses"][-1], st.session_state["possibilities"])
-
+    with input:
         if not st.session_state["game_over"]:
-            if len(st.session_state["possibilities"]) < 3:
-                stats = {
-                    'Top picks': [],
-                    'E[Info.]': []
+            st.text_input("Enter your guess:", max_chars=5,
+                        key='guess', on_change=input_guess).upper()
+
+    with restart:
+        m = st.markdown("""
+            <style>
+            div.stButton > button:first-child {
+                background-color: #eb4242;
+                border-color: #eb4242;
+                color: #ffffff;
+                margin-top: 0.7rem;
+            }
+            div.stButton > button:hover {
+                background-color: #c22121;
+                border-color: #c22121;
+                color: #ffffff;
                 }
-                for word in st.session_state["possibilities"]:
-                    stats['Top picks'].append(word.lower())
-                    stats['E[Info.]'].append('')
-            else:
-                stats = get_stats(st.session_state["suggestions"])
-            df = pd.DataFrame(stats)
-            st.dataframe(df, width=200, hide_index=True)
+            </style>""", unsafe_allow_html=True)
 
-    if not st.session_state["game_over"] and len(st.session_state["possibilities"]) >= 3:
-        st.divider()
-        st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
-        if st.checkbox(label="Show Possible Answers"):
-            st.write(st.session_state["possibilities"])
+        if st.button("Restart Game"):
+            reset_game()
+            st.rerun()
 
-
-with sentiment:
-    st.header("🚀 Sentiment Analysis")
-    st.markdown(
-        """
-        Enter any **5-letter Wordle word**, and we'll analyze how people on Twitter felt about it! 🎉  
-        We'll also visualize sentiment trends and provide deeper insights into the sentiment distribution.
-        """
-    )
-
-    # Load datasets
-    try:
-        words_freq = pd.read_csv("data/words_freq.csv")
-        tweets = pd.read_csv("data/tweets.zip")
-    except FileNotFoundError as e:
-        st.error(f"Error: {e}. Ensure the file paths are correct.")
-        st.stop()
-
-    # Input Word
-    word = st.text_input("Enter a 5-letter Wordle word:", max_chars=5, key="sentiment").lower()
-
-    if word:
-        # Validate the word
-        if not word.isalpha() or len(word) != 5:
-            st.error("Please enter a valid 5-letter word.")
+    if st.session_state["game_over"]:
+        if st.session_state["game_won"]:
+            st.success(
+                f"Congratulations! Score: {len(st.session_state['guesses'])}/6")
         else:
-            # Check if word exists in dataset
-            word_entry = words_freq[words_freq["word"].str.lower() == word]
+            st.error(
+                f"Game Over! The correct word was {st.session_state['answer']}")
 
-            if word_entry.empty:
-                st.error(f"The word '{word}' was not found in the dataset.")
-            else:
-                # Get Wordle day and filter tweets
-                wordle_day = int(word_entry.iloc[0]["day"])
-                wordle_tweets = tweets[tweets["wordle_id"] == wordle_day]
+with stats:
+    st.subheader('Guess Suggestions')
 
-                if wordle_tweets.empty:
-                    st.error(f"No tweets found for Wordle #{wordle_day}.")
-                else:
-                    st.success(f"Analyzing tweets for Wordle #{wordle_day}...")
+    if len(st.session_state["guesses"]) > 0:
+        st.session_state["possibilities"] = analyze_guesses(
+            st.session_state["guesses"][-1], st.session_state["possibilities"])
 
-                    # Sentiment Analysis
-                    sentiments = {"positive": 0, "neutral": 0, "negative": 0}
-                    polarity_scores = []
-
-                    for _, row in wordle_tweets.iterrows():
-                        text = row["tweet_text"]
-                        # Skip grid-only tweets
-                        if text.count('\n') <= 1 and text.startswith("Wordle"):
-                            continue
-
-                        cleaned_text = ' '.join([
-                            line for line in text.split('\n')
-                            if not line.strip().startswith(('Wordle', '⬛', '⬜', '🟨', '🟩'))
-                        ])
-
-                        if cleaned_text.strip():
-                            analysis = TextBlob(cleaned_text)
-                            polarity = analysis.sentiment.polarity
-                            polarity_scores.append(polarity)
-
-                            if polarity > 0:
-                                sentiments["positive"] += 1
-                            elif polarity < 0:
-                                sentiments["negative"] += 1
-                            else:
-                                sentiments["neutral"] += 1
-
-                    total = sum(sentiments.values())
-
-                    # Results Display
-                    if total == 0:
-                        st.warning("No valid tweets found for analysis.")
-                    else:
-                        avg_sentiment = sum(polarity_scores) / len(polarity_scores)
-                        sentiment_label = "😊 Positive" if avg_sentiment > 0 else "😐 Neutral" if avg_sentiment == 0 else "😟 Negative"
-
-                        st.subheader(f"Results for '{word}' (Wordle #{wordle_day}):")
-                        st.markdown(f"**Total Tweets Analyzed:** {total}")
-                        st.markdown(f"**Average Sentiment:** {sentiment_label} ({avg_sentiment:.3f})")
-
-                        # Sentiment Breakdown with Metrics
-                        st.markdown("### Sentiment Breakdown")
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Positive 😊", sentiments["positive"])
-                        col2.metric("Neutral 😐", sentiments["neutral"])
-                        col3.metric("Negative 😟", sentiments["negative"])
-
-                        # Sentiment Polarity Distribution
-                        st.markdown("### Sentiment Polarity Distribution")
-                        polarity_data = pd.DataFrame({"Polarity": polarity_scores})
-                        fig = px.histogram(
-                            polarity_data,
-                            x="Polarity",
-                            nbins=20,
-                            title="Polarity Score Distribution",
-                        )
-                        fig.update_layout(
-                            bargap=0.2,
-                            xaxis_title="Polarity",
-                            yaxis_title="Tweet Count",
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-with forest:
-    st.header("🎯 Score Predictor")
-    # Load datasets
-    st.markdown(
-    """
-    Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
-    We'll also show worldwide statistics to see how your word stacks up.
-    """)
-    word = st.text_input("Enter a 5-letter Wordle word:", max_chars=5, key="forest").lower()
-    if word:
-        # Validate the word
-        if not word.isalpha() or len(word) != 5:
-            st.error("Please enter a valid 5-letter word.")
+    if not st.session_state["game_over"]:
+        if len(st.session_state["possibilities"]) < 3:
+            stats = {
+                'Top picks': [],
+                'E[Info.]': []
+            }
+            for word in st.session_state["possibilities"]:
+                stats['Top picks'].append(word.lower())
+                stats['E[Info.]'].append('')
         else:
-            st.success(f"Making inference...")
+            stats = get_stats(st.session_state["suggestions"])
+        df = pd.DataFrame(stats)
+        st.dataframe(df, width=200, hide_index=True)
 
-            @st.cache_data
-            def load_data():
-                words = pd.read_csv("data/words_freq.csv")
-                tweets = pd.read_csv("data/tweets.zip")
-                tweets["score"] = tweets["tweet_text"].str[11]
-                tweets["score"] = pd.to_numeric(tweets['score'], errors='coerce')
-                tweets.rename(columns={"wordle_id": "day"}, inplace=True)
-                words.dropna(inplace=True)
-                words["day"] = pd.to_numeric(words['day'], errors='coerce')
-                freqs = pd.read_csv("data/letter-frequencies.csv")
-                freqs = freqs[["Letter", "English"]]
-                freqs = freqs["English"].tolist()
-                df = pd.merge(words, tweets, on='day')
-                df.drop(columns=['tweet_id'], inplace=True)
-                averages = df.groupby("word", as_index=False)['score'].mean()
+if not st.session_state["game_over"] and len(st.session_state["possibilities"]) >= 3:
+    st.divider()
+    st.subheader(f'Possible Answers: {len(st.session_state["possibilities"])}')
+    if st.checkbox(label="Show Possible Answers"):
+        st.write(st.session_state["possibilities"])
 
-                percents = [0.08, 4.61, 24.68, 37.27, 24.86, 7.98, 2.65]
-                labels = ["1st", "2nd", "3rd", "4th", "5th", "6th", "Loss"]
-                chart_data = pd.DataFrame(
-                    {
-                        "Tries": labels,
-                        "Percentage": percents,
-                    }
-                )
-                countries = pd.read_csv("data/countries.csv")
-                global_cities = pd.read_csv("data/top10_global_cities.csv")
-                us_cities = pd.read_csv("data/top10_us_cities.csv")
-                states = pd.read_csv("data/states.csv")
-                return df, freqs, averages, chart_data, countries, global_cities, us_cities, states
-            df, freqs, averages, chart_data, countries, global_cities, us_cities, states = load_data()
-
-            @st.cache_resource
-            def load_model():
-                filename = 'data/wordle_prediction.pkl'
-                model = pickle.load(open(filename, 'rb'))
-                return model
-            model = load_model()
-
-
-            # For any given word:
-            #    1. Put the word in lower case
-            #    2. Extract each letter in the word and make it it's own column
-            #    3. Convert to ASCII number using ord() function
-            #    4. subtract 97 to simplify char to number representation (a = 0, b = 1, c = 2, ...)
-            #    5. Use number representation as index in frequency array
-
-            def predict_score(word):
-                if (not word.isalpha() or len(word) != 5):
-                    raise Exception(
-                        "Invalid word format. Please enter a five letter word using only alphabetic characters.")
-                df = pd.DataFrame()
-                df["word"] = [word]
-                df["letter_1"] = df["word"].str.lower().str[0].apply(ord) - 97
-                df["letter_2"] = df["word"].str.lower().str[1].apply(ord) - 97
-                df["letter_3"] = df["word"].str.lower().str[2].apply(ord) - 97
-                df["letter_4"] = df["word"].str.lower().str[3].apply(ord) - 97
-                df["letter_5"] = df["word"].str.lower().str[4].apply(ord) - 97
-                df["freq"] =    freqs[df["letter_1"][0]] + \
-                                freqs[df["letter_2"][0]] + \
-                                freqs[df["letter_3"][0]] + \
-                                freqs[df["letter_4"][0]] + \
-                                freqs[df["letter_5"][0]]
-                df.drop(columns=["word"], inplace=True)
-                return model.predict(df)
-            
-            prediction = predict_score(word)
-            # If word isn't found in tweet data, None is returned for the average score
-            average = None
-            if word in averages["word"].values:
-                average = averages[averages["word"] == word]["score"].item()
-            st.subheader(f"Results for '{word}':")
-            col1, col2= st.columns(2)
-            with col1:
-                st.subheader("🌳")
-                st.markdown("**Predicted average score via random forests:**")
-                st.subheader("{:0.2f}".format(prediction[0]))
-            with col2:
-                # Print average score according to tweet data if the word exists in it
-                st.subheader("𝕏")
-                if average == None:
-                    st.markdown(("**No data found for this word in tweet data.**"))
-                else:
-                    st.markdown("**Average score via tweet data:**")
-                    st.subheader("\t\t\t{:0.2f}".format(average))
-            # 3.83 is the average number of turns in Wordle
-            if prediction > 3.83:
-                st.subheader("🤔 Your word is hard to guess!")
-                st.markdown("The average Wordle score is **3.83**. Looks like you chose a tough one!")
-            else:
-                st.subheader("🥳 Streak savior!")
-                st.markdown("The average Wordle score is **3.83**. Looks like the average person should be able to figure this one out.")
-            st.markdown("**Refer to the chart below to see the percentage breakdown for the results of every Wordle game!**")
-
-            c = alt.Chart(chart_data).mark_bar().encode(x='Tries', y='Percentage')
-            st.altair_chart(c, use_container_width=True) 
-            st.subheader("🌎 Your word vs. the world")
-
-            def get_bounds(scores, names, prediction):
-                if prediction > max(scores):
-                    return None, float('inf')
-                elif prediction < min(scores):
-                    return float('-inf'), None
-                
-                idx = np.argsort(scores)
-                names = np.array(names)[idx]
-                scores.sort()
-                higher = float('inf')
-                lower = float('-inf')
-                for i in range(len(scores)):
-                    if scores[i] > prediction and scores[i] < higher:
-                        higher = i
-                    if scores[i] < prediction and scores[i] > lower:
-                        lower = i
-                return higher, lower
-
-            st.markdown("### Global ranking")
-            st.markdown("The below chart shows a map of the world organized by the **average scores of each country**.")
-            names = countries["Country"].tolist()
-            scores = countries["Score"].tolist()
-            higher, lower = get_bounds(scores, names, prediction)
-            if higher == None:
-                st.markdown("The predicted score of your word is **higher** than all of the countries around the world.  \n Broadly speaking, your word may be difficult to guess around the world!  \n")
-            elif lower == None:
-                st.markdown("The predicted score of your word is **lower** than all of the countries around the world.  \n Broadly speaking, your word may be easy to guess around the world! \n")
-            else:
-                st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
-            fig = px.choropleth(countries, locations="Code", color="Score", color_continuous_scale="Viridis", hover_name="Country", range_color=(3, 4))
-            st.plotly_chart(fig)
-            st.markdown("### Global city ranking")
-            st.markdown("The below chart shows the **10 cities worldwide with the best scores**.")
-            scores = global_cities["Score"].tolist()
-            names = global_cities["City"].tolist()
-            higher, lower = get_bounds(scores, names, prediction)
-            if higher == None:
-                st.markdown("The predicted score of your word is **higher** than all of the scores of the top 10 global cities.  \n Maybe you can stump them!  \n")
-            elif lower == None:
-                st.markdown("The predicted score of your word is **lower** than all of the scores of the top 10 global cities.  \n How easily they can guess your word?  \n")
-            else:
-                st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
-            c = alt.Chart(global_cities).mark_bar().encode(x=alt.X('Score:Q', scale=alt.Scale(domain=(3.5, 3.72), clamp=True)), y=alt.Y('City:O', axis=alt.Axis(labelLimit=200)).sort('x'))
-            st.altair_chart(c.properties(height = 500), use_container_width=True) 
-            st.markdown("### United States state ranking")
-            st.markdown("The below chart shows a map of the United States organized by the **average scores of each state**.")
-            names = states["State"].tolist()
-            scores = states["Score"].tolist()
-            higher, lower = get_bounds(scores, names, prediction)
-            if higher == None:
-                st.markdown("The predicted score of your word is **higher** than all of the scores of each U.S. state.  \n Your word might be tough for the average American!  \n")
-            elif lower == None:
-                st.markdown("The predicted score of your word is **lower** than all of the scores of each U.S. state.  \n Can the average American guess your word easily?  \n")
-            else:
-                st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
-            fig = px.choropleth(states, locations="Abbreviation", locationmode="USA-states", color="Score", scope="usa", hover_name="State", color_continuous_scale="Viridis", range_color=(3, 4),)
-            st.plotly_chart(fig)
-            st.markdown("### United States city ranking")
-            st.markdown("The below chart shows the **10 cities in the United States with the best scores**.")
-            names = us_cities["City"].tolist()
-            scores = us_cities["Score"].tolist()
-            higher, lower = get_bounds(scores, names, prediction)
-            if higher == None:
-                st.markdown("The predicted score of your word is **higher** than all of the scores of the top 10 U.S. cities.  \n Maybe you can stump them!  \n")
-            elif lower == None:
-                st.markdown("The predicted score of your word is **lower** than all of the scores of the top 10 U.S. cities.  \n Wonder how easily they can guess your word?  \n")
-            else:
-                st.markdown(f"The predicted score of your word is **higher than {names[lower]}'s score ({scores[lower]})** and **lower than {names[higher]}'s score ({scores[higher]})**.  \n")
-            c = alt.Chart(us_cities).mark_bar().encode(x=alt.X('Score:Q', scale=alt.Scale(domain=(3.5, 3.67), clamp=True)), y=alt.Y('City:O').sort('x'))
-            st.altair_chart(c.properties(height = 500), use_container_width=True) 

@@ -883,10 +883,10 @@ with forest:
 
     st.markdown(
     """
-    Enter any **5-letter Wordle word**, and we'll predict the number of guesses it'll take everyone to get it! 💭
+    Enter any **5-letter word**, and we'll predict the average number of guesses it'll take everyone to get it! 💭
     We'll also show worldwide statistics to see how your word stacks up.
     """)
-    word = st.text_input("Enter a 5-letter Wordle word:", max_chars=5, key="forest").lower()
+    word = st.text_input("Enter a 5-letter word:", max_chars=5, key="forest").lower()
     if word:
         # Validate the word
         if not word.isalpha() or len(word) != 5:
@@ -1056,7 +1056,7 @@ with rag:
                 st.error(f"PDF file not found at: {pdfpath}")
                 st.stop()
 
-            st.write(f"Loading PDF from: {pdfpath}")
+            # st.write(f"Loading PDF from: {pdfpath}")
 
             # Load PDF
             loader = PyPDFLoader(pdfpath)
@@ -1093,7 +1093,7 @@ with rag:
             raise e
 
     # Page title
-    st.title("Ask About Cheatdle")
+    st.header("🤖 Ask About Cheatdle")
 
     # Initialize session state for messages
     if "messages" not in st.session_state:
@@ -1121,7 +1121,7 @@ with rag:
     if "last_prompt" not in st.session_state:
         st.session_state.last_prompt = ""
 
-    prompt = st.chat_input("Ask a question about Cheatdle...")
+    prompt = st.chat_input("Ask your question here...")
 
     if prompt and prompt != st.session_state.last_prompt:
         st.session_state.last_prompt = prompt
