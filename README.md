@@ -70,7 +70,7 @@
 
 Cheatdle is an application to maximize efficiency when playing Wordle, using information theory and machine learning. 
 
-Originally an adaptation of 3Blue1Brown's video, _[Solving Wordle using information theory](https://www.youtube.com/watch?v=v68zYyaEmEA)_, it also allows users to predict how difficult any possible Wordle answer, and determine the public sentiment of some past Wordle answers using tweet data. Users can also view graphs of Wordle facts and statistics from all over the world.
+Originally an adaptation of 3Blue1Brown's video, _[Solving Wordle using information theory](https://www.youtube.com/watch?v=v68zYyaEmEA)_, it also allows users to predict the difficulty of any possible Wordle answer, and determine the public sentiment of some past Wordle answers using Tweet data. Users can also view graphs of Wordle facts and statistics from all over the world.
 
 You can learn more about this project by referring to the project design document, or by asking the project RAG!
 
